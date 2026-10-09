@@ -16,7 +16,9 @@ RUN install2.r --error \
     rintrojs \
     plotly \
     dashboardthemes \
-    starsExtra
+    starsExtra \
+    shinyvalidate \
+    yaml
 
 RUN R -e "devtools::install_github('hadley/emo')"
 RUN R -e "devtools::install_github('Appsilon/shiny.i18n')"

@@ -86,6 +86,30 @@ The zip-file contains the following files:
 
 ***User Action:** Click on Download results > Download.*
 
+### 5. Contribute Your Peat Depths (optional)
+
+Your peat depth measurements are valuable beyond your own project: gathered together, they can become training data for national peat mapping. After a successful calculation with your own data, CarbonViewer asks whether you want to contribute. You can also open **Contribute data** in the sidebar at any time.
+
+A short wizard turns your points into files that follow the [Data Exchange Standard for Peat Surveys v1.0](https://github.com/NINAnor/carbonviewer/tree/main/standard) (Natural England) with a Norwegian profile:
+
+1. **About:** what happens to the data, and a note on personal data.
+2. **Review points:** a map and a table. Coordinates, depth and defaults are filled in. You can edit the date and remarks per point, and mark points where the probe did not reach the bottom of the peat.
+3. **Measurements:** survey date(s), who measured, probe type, whether the bottom of the peat was reached, depth resolution and how positions were measured.
+4. **Dataset:** title, organisation, a short description, contact email and licence.
+5. **Check:** the data are checked against the standard, and a draft methods text and citation are suggested.
+6. **Download:** a zip file with the standardized data.
+
+```{text}
+/Downloads/peat_depths_standard_date.zip
+├── peat_data.csv      # one row per measurement, columns in the standard's order
+├── metadata.csv       # one row describing the dataset
+└── README.txt         # which standard and profile the files follow
+```
+
+Nothing is stored on the server; you decide what to do with the file. Columns in your CSV named like attributes of the standard (e.g. `probeReachedBottom`, `recordDate`, `locationRemarks`) are used as they are, and other columns are kept as extra columns. The test data cannot be contributed.
+
+***User Action:** Click on Contribute data. Follow the steps and click on Download standardized data.*
+
 ---
 
 ## Overview of Methods

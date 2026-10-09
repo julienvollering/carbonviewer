@@ -20,6 +20,8 @@ library(shiny.i18n)
 library(tmap)
 library(stars)
 library(starsExtra)
+library(shinyvalidate)
+library(yaml)
 
 
 # Translation file

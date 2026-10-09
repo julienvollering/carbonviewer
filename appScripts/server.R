@@ -69,6 +69,15 @@ server <- function(input, output, session){
     values$upload_state <- 'test'
   })
   
+  # Optional "Contribute data" module (appScripts/contribute.R)
+  if (contribute_enabled()) {
+    contribute <- mod_contribute_server("contribute",
+                                        points = reactive(df_reactive$points),
+                                        shape = reactive(df_reactive$shape),
+                                        upload_state = reactive(values$upload_state),
+                                        lang = reactive(input$selected_language %||% "no"))
+  }
+  
   # ! PRIMARY PART !
   # Unzip the file into the unique session folder
   # and return the df_reactive used for the calculations and plots
@@ -180,6 +189,11 @@ server <- function(input, output, session){
           # Fill the plots with the MAE and volume
           df_reactive$maeVSpower <- interp[[4]]
           df_reactive$volumeVSpower <- interp[[5]]
+          
+          # Invite the user to contribute their points (never for the test data)
+          if (contribute_enabled() && values$upload_state == 'uploaded') {
+            contribute$invite()
+          }
           
           print("df_reactive:")
           observe({

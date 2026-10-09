@@ -2,6 +2,10 @@
 source("/home/rstudio/app/appScripts/dependancies.R")
 source("/home/rstudio/app/appScripts/global.R")
 source("/home/rstudio/app/appScripts/custom_theme.R")
+# Optional "Contribute data" module; switch off with options(carbonviewer.contribute = FALSE)
+options(carbonviewer.contribute = TRUE)
+source("/home/rstudio/app/appScripts/standard.R")
+source("/home/rstudio/app/appScripts/contribute.R")
 source("/home/rstudio/app/appScripts/ui.R")
 source("/home/rstudio/app/appScripts/server.R")
 

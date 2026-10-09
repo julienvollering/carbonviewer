@@ -1,0 +1,185 @@
+# CarbonViewer Norwegian profile of the Data Exchange Standard for Peat Surveys
+#
+# A thin overlay on peat_standard_v1.0.yaml (profile 1.0-corr.1). It changes no
+# attribute or term of the standard. It only adds:
+# - NO/EN labels and help text for the fields CarbonViewer asks about,
+# - Norwegian defaults (country, coordinate systems),
+# - the subset of allowed values shown to users (e.g. licences),
+# - the attributes CarbonViewer leaves out of its output.
+# Every value written with this profile is valid under the base profile.
+#
+# Keep the "no" keys quoted: YAML 1.1 reads a bare `no` as the boolean false.
+
+profile:
+  name: CarbonViewer Norwegian profile
+  profile_version: "0.1.0"
+  date: "2026-10-09"
+  based_on: peat_standard_v1.0.yaml
+  based_on_profile_version: "1.0-corr.1"
+  languages: ["no", en]
+
+# Values written to every record unless the uploaded CSV gives its own.
+defaults:
+  peat_data:
+    country: Norway
+    geodeticDatum: "EPSG:4326"      # latitude/longitude are always WGS 84
+    verbatimSRS: "EPSG:25833"       # always written: the standard assumes EPSG:27700 when absent
+    peatDepthResolution: "Nearest 1cm"
+
+# Attributes and terms CarbonViewer never writes.
+hidden:
+  peat_data: [gridReference]        # Ordnance Survey grid references do not apply in Norway
+  metadata: []
+
+# Labels and help text, keyed by attribute or term name.
+fields:
+  recordDate:
+    label: {"no": "Måledato", en: "Survey date"}
+    help:
+      "no": "Dagen (eller periode) torvdybdene ble målt. Velg samme dato to ganger hvis målingene ble gjort på én dag."
+      en: "The day (or period) the peat depths were measured. Pick the same date twice if the survey took one day."
+  surveyor:
+    label: {"no": "Hvem målte?", en: "Who measured?"}
+    help:
+      "no": "Navn på personer, gruppe eller organisasjon. Du kan skrive et organisasjonsnavn for å unngå personopplysninger."
+      en: "Names of people, a group or an organisation. You can give an organisation name to avoid personal data."
+  probeType:
+    label: {"no": "Måleutstyr", en: "Probe type"}
+    help:
+      "no": "Hva slags sonde eller prøvetaker ble brukt? Velg «Annet» og beskriv utstyret under merknader hvis det ikke står i listen."
+      en: "What kind of probe or sampler was used? Choose 'Other' and describe it in the remarks if it is not listed."
+  probeReachedBottom:
+    label: {"no": "Nådde dere bunnen av torva?", en: "Did you reach the bottom of the peat?"}
+    help:
+      "no": "Hvis sonden ikke nådde bunnen, er dybden en minsteverdi. Standarden sier «Nei» hvis du er usikker."
+      en: "If the probe did not reach the bottom, the depth is a minimum. The standard says 'No' if you are unsure."
+  peatDepthResolution:
+    label: {"no": "Måleoppløsning", en: "Depth resolution"}
+    help:
+      "no": "Hvor nøyaktig ble dybden lest av?"
+      en: "How precisely was the depth read?"
+  coordinateUncertainty:
+    label: {"no": "Hvordan ble posisjonene målt?", en: "How were the positions measured?"}
+    help:
+      "no": "Brukes til å anslå usikkerheten i posisjonen (i meter)."
+      en: "Used to estimate the position uncertainty (in metres)."
+  peatDepthRemarks:
+    label: {"no": "Merknader til målingene", en: "Remarks on the measurements"}
+    help:
+      "no": "Valgfritt. Gjelder alle punkter, f.eks. «Steinete bunn, vanskelig å finne overgangen». Du kan skrive egne merknader per punkt i tabellen."
+      en: "Optional. Applies to all points, e.g. 'Stony base, transition hard to find'. You can add per-point remarks in the table."
+  location:
+    label: {"no": "Stedsnavn", en: "Place name"}
+    help:
+      "no": "Navn på myra eller stedet, f.eks. «Kaldvassmyra»."
+      en: "Name of the peatland or place, e.g. 'Kaldvassmyra'."
+  title:
+    label: {"no": "Tittel på datasettet", en: "Dataset title"}
+    help:
+      "no": "Ta gjerne med tema, tid og sted, f.eks. «Torvdybder Kaldvassmyra, juni 2026»."
+      en: "Include subject, dates and place, e.g. 'Peat depths Kaldvassmyra, June 2026'."
+  organizationName:
+    label: {"no": "Organisasjon", en: "Organisation"}
+    help:
+      "no": "Organisasjonen eller gruppen som har ansvar for dataene. Brukes også som «institution» i hver rad."
+      en: "The organisation or group responsible for the data. Also used as 'institution' on every row."
+  abstract:
+    label: {"no": "Kort beskrivelse", en: "Abstract"}
+    help:
+      "no": "Hva slags prosjekt var dette, og hva slags myr/naturtype gjelder det?"
+      en: "What project was this for, and what kind of peatland or habitat is it?"
+  purpose:
+    label: {"no": "Formål", en: "Purpose"}
+    help:
+      "no": "Valgfritt. Hvorfor ble målingene gjort? F.eks. «Kartlegging før utbygging»."
+      en: "Optional. Why were the measurements taken? E.g. 'Survey before development'."
+  contactElectronicMailAddress:
+    label: {"no": "E-post til kontaktperson", en: "Contact email"}
+    help:
+      "no": "Brukes bare hvis noen har spørsmål om datasettet. Kan gjerne være en felles e-postadresse."
+      en: "Only used if someone has questions about the dataset. A shared address is fine."
+  license:
+    label: {"no": "Lisens", en: "Licence"}
+    help:
+      "no": "Hvordan kan andre bruke dataene? CC BY er anbefalt: fri bruk med kreditering."
+      en: "How may others use the data? CC BY is recommended: free use with attribution."
+  rights:
+    label: {"no": "Bruksvilkår", en: "Usage rights"}
+    help:
+      "no": "Beskriv vilkårene når du velger «Annet», f.eks. «NLOD 2.0»."
+      en: "Describe the terms when you choose 'Other', e.g. 'NLOD 2.0'."
+  geographicDescription:
+    label: {"no": "Geografisk område", en: "Geographic description"}
+    help:
+      "no": "Valgfritt. Større område, f.eks. kommune eller verneområde."
+      en: "Optional. Wider area, e.g. municipality or protected area."
+  methods:
+    label: {"no": "Metode", en: "Methods"}
+    help:
+      "no": "Et utkast er laget ut fra svarene dine. Rediger det gjerne."
+      en: "A draft is built from your answers. Feel free to edit it."
+  bibliographicCitation:
+    label: {"no": "Foreslått sitering", en: "Suggested citation"}
+    help:
+      "no": "Slik bør datasettet siteres. Rediger det gjerne."
+      en: "How the dataset should be cited. Feel free to edit it."
+
+# Allowed values shown to users, with labels. Each `value` must be one of the
+# standard's allowed values (checked when the standard is loaded).
+choices:
+  license:
+    - value: CC-BY
+      label: {"no": "CC BY 4.0 – fri bruk med kreditering (anbefalt)", en: "CC BY 4.0 – free use with attribution (recommended)"}
+    - value: CC0
+      label: {"no": "CC0 – fritt til alle formål", en: "CC0 – no restrictions"}
+    - value: CC-BY-NC
+      label: {"no": "CC BY-NC 4.0 – ikke-kommersiell bruk", en: "CC BY-NC 4.0 – non-commercial use only"}
+    - value: Other
+      label: {"no": "Annet (f.eks. NLOD 2.0) – beskriv i bruksvilkår", en: "Other (e.g. NLOD 2.0) – describe in usage rights"}
+  probeType:
+    - value: peat probe
+      label: {"no": "Torvsonde / jordsonde", en: "Peat probe"}
+    - value: avalanche probe
+      label: {"no": "Skredsøkestang", en: "Avalanche probe"}
+    - value: cable rod
+      label: {"no": "Kabelstang", en: "Cable rod"}
+    - value: drainage rod
+      label: {"no": "Rørrenserstang / drensstang", en: "Drainage rod"}
+    - value: threaded rod
+      label: {"no": "Gjengestang", en: "Threaded rod"}
+    - value: peat borer
+      label: {"no": "Torvbor (f.eks. russisk bor)", en: "Peat borer (e.g. Russian borer)"}
+    - value: soil corer
+      label: {"no": "Jordprøvetaker", en: "Soil corer"}
+    - value: open end corer
+      label: {"no": "Åpen kjerneprøvetaker", en: "Open end corer"}
+    - value: stick
+      label: {"no": "Stokk / pinne", en: "Stick"}
+    - value: other
+      label: {"no": "Annet (beskriv under merknader)", en: "Other (describe in the remarks)"}
+  peatDepthResolution:
+    - value: Nearest 1cm
+      label: {"no": "Nærmeste 1 cm", en: "Nearest 1 cm"}
+    - value: Nearest 5cm
+      label: {"no": "Nærmeste 5 cm", en: "Nearest 5 cm"}
+    - value: Nearest 10cm
+      label: {"no": "Nærmeste 10 cm", en: "Nearest 10 cm"}
+
+# Positioning methods and the coordinateUncertainty (m) each implies.
+positioning:
+  - id: phone
+    uncertainty_m: 10
+    label: {"no": "Mobiltelefon (ca. 10 m)", en: "Mobile phone (about 10 m)"}
+    methods: {"no": "mobiltelefon", en: "mobile phone"}
+  - id: gnss
+    uncertainty_m: 5
+    label: {"no": "Håndholdt GPS/GNSS (ca. 5 m)", en: "Handheld GPS/GNSS (about 5 m)"}
+    methods: {"no": "håndholdt GNSS-mottaker", en: "handheld GNSS receiver"}
+  - id: rtk
+    uncertainty_m: 0.1
+    label: {"no": "RTK/landmåling (ca. 0,1 m)", en: "RTK / survey grade (about 0.1 m)"}
+    methods: {"no": "RTK-GNSS", en: "RTK GNSS"}
+  - id: custom
+    uncertainty_m: null
+    label: {"no": "Annet – oppgi usikkerhet selv", en: "Other – enter the uncertainty"}
+    methods: {"no": "annen metode", en: "another method"}

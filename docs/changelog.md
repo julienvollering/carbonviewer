@@ -4,6 +4,10 @@
 
 **Added**
 - export to .txt file 
+- optional "Contribute data" wizard: turns the uploaded peat depths into files following the
+  Data Exchange Standard for Peat Surveys v1.0 (Natural England) with a Norwegian profile, for download
+    - new `standard/` folder with the machine-readable standard and the Norwegian profile
+    - new dependencies: `shinyvalidate`, `yaml`
 
 **Changed**
 - peat depth unit changed from m to cm

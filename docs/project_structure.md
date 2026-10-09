@@ -7,14 +7,17 @@
         deploy.yml          # Github action for deployment
 ├── appScripts
     ├── custom_theme.R      # Custom theme for the app 
+    ├── contribute.R        # Optional "Contribute data" module (standardize + download peat depths)
     ├── dependancies.R      # Required packages and translation object (i18n)
     ├── global.R            # Global variables
     ├── server.R            # Server side of the app
+    ├── standard.R          # Loads the peat survey standard (YAML) and validates data against it
     ├── ui.R                # User interface of the app
 ├── data                    # Data folder
     ├── gran_dataset.zip    # gran dataset with peat properties for norwegian mires
 ├── docs
     ├── changelog.md         # Changelog for the app
+    ├── contribute_plan.md   # Plan for the "Contribute data" module (phases 1-3)
     ├── project_structure.md # Project structure
     ├── instructions.md            # instructions for the app (main body app)
 ├── man
@@ -26,6 +29,13 @@
         ├── statnett.png
 ├── Rscripts 
     ├── exploration.R       # IDW interpolation (stand-alone)
+├── standard                # Data Exchange Standard for Peat Surveys v1.0 (read by the app at runtime)
+    ├── Data Exchange Standard for Peat Surveys v1.0.pdf  # Source document (Natural England)
+    ├── peat_standard_v1.0.yaml          # Corrected machine-readable profile (1.0-corr.1), authoritative
+    ├── peat_standard_no_profile.yaml    # Norwegian overlay: NO/EN labels, defaults, licence choices
+    ├── peat_data_attributes.csv         # Flat view of the peat data attributes
+    ├── peat_metadata_terms.csv          # Flat view of the metadata terms
+    ├── peat_standard_changes.csv        # Corrections C1-C6 against the published v1.0
 ├── test                    # Test data
     ├── csv_only.zip
     ├── invalid_csv.zip
@@ -52,3 +62,9 @@
 - Make changes, save and run the app in the Rstudio terminal: `shiny::runApp()`
 
 
+
+### "Contribute data" module
+- Optional; switch it off with `options(carbonviewer.contribute = FALSE)` in `app.R`.
+- Code in `appScripts/contribute.R` (module + helpers) and `appScripts/standard.R` (standard loader + validator).
+- The app reads `standard/peat_standard_v1.0.yaml` and `standard/peat_standard_no_profile.yaml` at runtime. With docker compose, `./standard` is mounted into the container.
+- Phase 1 only standardizes and offers a download; `store_submission()` is a stub for a later submission step. See `docs/contribute_plan.md`.

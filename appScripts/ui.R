@@ -16,7 +16,7 @@ header <- shinydashboard::dashboardHeader(title = "CarbonViewer",
 
 # SIDEBAR -----------------------------------------------------------------------------------------
 sidebar <- shinydashboard::dashboardSidebar(
-  sidebarMenu(
+  sidebarMenu(id = "tabs",
     shiny.i18n::usei18n(i18n),
       selectInput('selected_language',
                     i18n$t("Skift språk"),
@@ -85,6 +85,11 @@ sidebar <- shinydashboard::dashboardSidebar(
     
     menuItem(i18n$t("Last ned resultater"), tabName = "download", icon = icon("file-export"),
       downloadButton("downloadData", shiny::HTML("Download"))
+    ),
+    
+    # Optional "Contribute data" module (appScripts/contribute.R)
+    .list = if (contribute_enabled()) list(
+      menuItem(i18n$t("Bidra med data"), tabName = "contribute", icon = icon("share-from-square"))
     )
   ),
   hr(),
@@ -99,7 +104,7 @@ body <- shinydashboard::dashboardBody(
   
   customTheme,
   
-  tabItems(
+  do.call(tabItems, c(list(
     
     tabItem(
       tabName = "instruction",
@@ -126,7 +131,11 @@ body <- shinydashboard::dashboardBody(
               box(plotOutput("maeVSpower"), width = 6),
               box(plotOutput("volumeVSpower"), width = 6),
             ))
-  )
+  ),
+  # Optional "Contribute data" module (appScripts/contribute.R)
+  if (contribute_enabled()) list(
+    tabItem(tabName = "contribute", mod_contribute_ui("contribute"))
+  )))
 )
 
 # Put them together into a dashboardPage
