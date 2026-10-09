@@ -20,8 +20,8 @@ RUN install2.r --error \
     shinyvalidate \
     yaml
 
-RUN R -e "devtools::install_github('hadley/emo')"
-RUN R -e "devtools::install_github('Appsilon/shiny.i18n')"
+RUN install2.r --error remotes shiny.i18n
+RUN R -e "remotes::install_github('hadley/emo', upgrade = 'never')"
 
 COPY . ./home/rstudio/app/
 
@@ -29,4 +29,4 @@ COPY . ./home/rstudio/app/
 RUN mkdir -p ./home/rstudio/.config/rstudio/
 RUN cp ./home/rstudio/app/rstudio-prefs.json ./home/rstudio/.config/rstudio/
 
-CMD Rscript ./home/rstudio/app/app.R
+CMD ["Rscript", "/home/rstudio/app/app.R"]
