@@ -90,9 +90,9 @@ Torvdybdemålingene dine er verdifulle utover ditt eget prosjekt: samlet kan de 
 En kort veiviser gjør punktene dine om til filer som følger [Data Exchange Standard for Peat Surveys v1.0](https://github.com/NINAnor/carbonviewer/tree/main/standard) (Natural England) med en norsk profil:
 
 1. **Om bidraget:** hva som skjer med dataene, og en merknad om personopplysninger.
-2. **Se over punktene:** et kart og en tabell. Koordinater, dybde og standardverdier er fylt inn. Du kan rette dato og merknader per punkt, og merke punkter der sonden ikke nådde bunnen av torva.
-3. **Om målingene:** måledato(er), hvem som målte, måleutstyr, om bunnen av torva ble nådd, måleoppløsning og hvordan posisjonene ble målt.
-4. **Om datasettet:** tittel, organisasjon, kort beskrivelse, e-post til kontaktperson og lisens.
+2. **Om målingene:** måledato(er), hvem som målte, måleutstyr, om bunnen av torva ble nådd, måleoppløsning og hvordan posisjonene ble målt.
+3. **Se over punktene:** en tabell ved siden av et kart, med svarene dine fylt inn. Hvis sonden ikke nådde bunnen i noen punkter, merker du disse punktene her: velg dem ved å klikke på rader i tabellen eller på punkter i kartet. Du kan også rette dato og merknader per punkt. Hold musepekeren over en kolonneoverskrift for å se hva den betyr.
+4. **Om datasettet:** tittel, organisasjon, kort beskrivelse, e-post til kontaktperson og lisens (CC BY, CC0, CC BY-NC, NLOD 2.0 eller annet).
 5. **Kontroll:** dataene sjekkes mot standarden, og det foreslås et utkast til metodetekst og sitering.
 6. **Last ned:** en zip-fil med de standardiserte dataene.
 
@@ -105,7 +105,7 @@ En kort veiviser gjør punktene dine om til filer som følger [Data Exchange Sta
 
 Ingenting lagres på serveren; du bestemmer selv hva du gjør med filen. Kolonner i CSV-filen din som heter det samme som attributter i standarden (f.eks. `probeReachedBottom`, `recordDate`, `locationRemarks`), brukes som de er, og andre kolonner tas med som ekstra kolonner. Testdataene kan ikke brukes til å bidra.
 
-***Brukerveiledning:** Trykk på Bidra med data. Følg stegene og trykk på Last ned standardiserte data.*
+***Brukerveiledning:** Trykk på Bidra med data. Følg stegene og trykk på Last ned standardiserte data. Du kan også klikke på stegnavnene øverst for å gå mellom stegene.*
 
 ---
 

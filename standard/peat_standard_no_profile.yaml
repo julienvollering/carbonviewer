@@ -3,6 +3,7 @@
 # A thin overlay on peat_standard_v1.0.yaml (profile 1.0-corr.1). It changes no
 # attribute or term of the standard. It only adds:
 # - NO/EN labels and help text for the fields CarbonViewer asks about,
+# - NO/EN descriptions of the columns shown in the wizard's tables,
 # - Norwegian defaults (country, coordinate systems),
 # - the subset of allowed values shown to users (e.g. licences),
 # - the attributes CarbonViewer leaves out of its output.
@@ -106,8 +107,8 @@ fields:
   rights:
     label: {"no": "Bruksvilkår", en: "Usage rights"}
     help:
-      "no": "Beskriv vilkårene når du velger «Annet», f.eks. «NLOD 2.0»."
-      en: "Describe the terms when you choose 'Other', e.g. 'NLOD 2.0'."
+      "no": "Beskriv vilkårene for bruk av dataene, f.eks. en annen lisens eller begrensninger."
+      en: "Describe the terms of use, e.g. another licence or restrictions."
   geographicDescription:
     label: {"no": "Geografisk område", en: "Geographic description"}
     help:
@@ -125,7 +126,11 @@ fields:
       en: "How the dataset should be cited. Feel free to edit it."
 
 # Allowed values shown to users, with labels. Each `value` must be one of the
-# standard's allowed values (checked when the standard is loaded).
+# standard's allowed values (checked when the standard is loaded). Values the
+# list leaves out stay valid in uploaded files.
+# A choice may also have:
+# - `id`: what the form uses instead of `value`, when two choices share a value;
+# - `rights`: text written to the metadata term `rights` with that choice.
 choices:
   license:
     - value: CC-BY
@@ -134,8 +139,12 @@ choices:
       label: {"no": "CC0 – fritt til alle formål", en: "CC0 – no restrictions"}
     - value: CC-BY-NC
       label: {"no": "CC BY-NC 4.0 – ikke-kommersiell bruk", en: "CC BY-NC 4.0 – non-commercial use only"}
+    - id: NLOD-2.0
+      value: Other                  # NLOD is not in the standard's list, so it is "Other" + rights
+      rights: "NLOD 2.0"
+      label: {"no": "NLOD 2.0 – Norsk lisens for offentlige data", en: "NLOD 2.0 – Norwegian Licence for Open Government Data"}
     - value: Other
-      label: {"no": "Annet (f.eks. NLOD 2.0) – beskriv i bruksvilkår", en: "Other (e.g. NLOD 2.0) – describe in usage rights"}
+      label: {"no": "Annet – beskriv i bruksvilkår", en: "Other – describe in usage rights"}
   probeType:
     - value: peat probe
       label: {"no": "Torvsonde / jordsonde", en: "Peat probe"}
@@ -143,18 +152,10 @@ choices:
       label: {"no": "Skredsøkestang", en: "Avalanche probe"}
     - value: cable rod
       label: {"no": "Kabelstang", en: "Cable rod"}
-    - value: drainage rod
-      label: {"no": "Rørrenserstang / drensstang", en: "Drainage rod"}
-    - value: threaded rod
-      label: {"no": "Gjengestang", en: "Threaded rod"}
     - value: peat borer
-      label: {"no": "Torvbor (f.eks. russisk bor)", en: "Peat borer (e.g. Russian borer)"}
+      label: {"no": "Torvbor (f.eks. russerbor)", en: "Peat borer (e.g. Russian borer)"}
     - value: soil corer
       label: {"no": "Jordprøvetaker", en: "Soil corer"}
-    - value: open end corer
-      label: {"no": "Åpen kjerneprøvetaker", en: "Open end corer"}
-    - value: stick
-      label: {"no": "Stokk / pinne", en: "Stick"}
     - value: other
       label: {"no": "Annet (beskriv under merknader)", en: "Other (describe in the remarks)"}
   peatDepthResolution:
@@ -164,6 +165,79 @@ choices:
       label: {"no": "Nærmeste 5 cm", en: "Nearest 5 cm"}
     - value: Nearest 10cm
       label: {"no": "Nærmeste 10 cm", en: "Nearest 10 cm"}
+
+# Descriptions of the peat data columns, shown when hovering over a column
+# heading in the wizard's tables and in the list under the review table.
+columns:
+  recordDate:
+    "no": "Dato for målingen (ÅÅÅÅ-MM-DD), eller en periode (ÅÅÅÅ-MM-DD/ÅÅÅÅ-MM-DD). Kan rettes per punkt."
+    en: "Date of the measurement (YYYY-MM-DD), or a period (YYYY-MM-DD/YYYY-MM-DD). Can be edited per point."
+  surveyor:
+    "no": "Hvem som målte (personer, gruppe eller organisasjon)."
+    en: "Who measured (people, a group or an organisation)."
+  institution:
+    "no": "Organisasjonen som har ansvar for dataene."
+    en: "The organisation responsible for the data."
+  location:
+    "no": "Stedsnavn, f.eks. navnet på myra."
+    en: "Place name, e.g. the name of the peatland."
+  country:
+    "no": "Land."
+    en: "Country."
+  latitude:
+    "no": "Breddegrad i desimalgrader (WGS 84, EPSG:4326)."
+    en: "Latitude in decimal degrees (WGS 84, EPSG:4326)."
+  longitude:
+    "no": "Lengdegrad i desimalgrader (WGS 84, EPSG:4326)."
+    en: "Longitude in decimal degrees (WGS 84, EPSG:4326)."
+  coordinateUncertainty:
+    "no": "Usikkerhet i posisjonen, i meter."
+    en: "Uncertainty of the position, in metres."
+  geodeticDatum:
+    "no": "Koordinatsystemet for latitude og longitude."
+    en: "Coordinate reference system of latitude and longitude."
+  easting:
+    "no": "Øst-koordinat i meter, i koordinatsystemet i verbatimSRS."
+    en: "Easting in metres, in the coordinate reference system given in verbatimSRS."
+  northing:
+    "no": "Nord-koordinat i meter, i koordinatsystemet i verbatimSRS."
+    en: "Northing in metres, in the coordinate reference system given in verbatimSRS."
+  verbatimSRS:
+    "no": "Koordinatsystemet for easting og northing (EPSG:25833 = ETRS89 / UTM sone 33N)."
+    en: "Coordinate reference system of easting and northing (EPSG:25833 = ETRS89 / UTM zone 33N)."
+  locationRemarks:
+    "no": "Valgfritt. Merknad om stedet der punktet ble målt, f.eks. «I grøft»."
+    en: "Optional. A remark on the place where the point was measured, e.g. 'In a ditch'."
+  surfacePeatDepth:
+    "no": "Torvdybde i cm, målt fra overflaten. Hentet fra filen din."
+    en: "Peat depth in cm, measured from the surface. Taken from your file."
+  peatDepthResolution:
+    "no": "Hvor nøyaktig dybden ble lest av."
+    en: "How precisely the depth was read."
+  peatPresence:
+    "no": "Om det var torv (Yes/No). Brukes bare når dybden mangler."
+    en: "Whether peat was present (Yes/No). Only used when there is no depth."
+  buriedPeatStartDepth:
+    "no": "Dybde (cm) der et begravd torvlag starter."
+    en: "Depth (cm) where a buried peat layer starts."
+  buriedPeatEndDepth:
+    "no": "Dybde (cm) der et begravd torvlag slutter."
+    en: "Depth (cm) where a buried peat layer ends."
+  surfaceElevation:
+    "no": "Høyden til bakken i cm, i høydesystemet i verticalDatum."
+    en: "Ground elevation in cm, in the height reference given in verticalDatum."
+  verticalDatum:
+    "no": "Høydesystemet for surfaceElevation, f.eks. EPSG:5941 (NN2000)."
+    en: "Height reference for surfaceElevation, e.g. EPSG:5941 (NN2000)."
+  probeType:
+    "no": "Måleutstyret som ble brukt."
+    en: "The probe or sampler that was used."
+  probeReachedBottom:
+    "no": "Nådde sonden bunnen av torva? «Yes» eller «No». «No» betyr at dybden er en minsteverdi."
+    en: "Did the probe reach the bottom of the peat? 'Yes' or 'No'. 'No' means the depth is a minimum."
+  peatDepthRemarks:
+    "no": "Valgfritt. Merknad om målingen i dette punktet, f.eks. «Stein i bunnen»."
+    en: "Optional. A remark on the measurement at this point, e.g. 'Stones at the base'."
 
 # Positioning methods and the coordinateUncertainty (m) each implies.
 positioning:

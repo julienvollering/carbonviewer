@@ -26,13 +26,17 @@ load_standard <- function(dir = file.path(app_dir, "standard"),
   prof <- yaml::read_yaml(file.path(dir, profile))
   std$no_profile <- prof
 
-  # Every value the overlay offers must be allowed by the base standard
+  # Every value the overlay offers must be allowed by the base standard,
+  # and each choice needs its own key (id or value) for the form
   for (name in names(prof$choices)) {
     allowed <- std_field(std, name)$allowed_values
     offered <- vapply(prof$choices[[name]], `[[`, "", "value")
     if (!is.null(allowed) && !all(offered %in% allowed)) {
       stop("Profile offers values not allowed for '", name, "': ",
            paste(setdiff(offered, allowed), collapse = ", "))
+    }
+    if (anyDuplicated(std_choice_keys(prof$choices[[name]]))) {
+      stop("Profile choices for '", name, "' need distinct ids")
     }
   }
   std
@@ -74,15 +78,33 @@ std_help <- function(std, name, lang = "no") {
   h[[lang]] %||% h[["en"]] %||% std_field(std, name)$description %||% ""
 }
 
-# Named vector (label = value) for select/radio inputs
+# Form key of each profile choice: its id, or else its value
+std_choice_keys <- function(choices) {
+  vapply(choices, function(x) x$id %||% x$value, "")
+}
+
+# Named vector (label = key) for select/radio inputs
 std_choices <- function(std, name, lang = "no") {
   ch <- std$no_profile$choices[[name]]
   if (is.null(ch)) {
     vals <- unlist(std_field(std, name)$allowed_values)
     return(stats::setNames(vals, vals))
   }
-  stats::setNames(vapply(ch, `[[`, "", "value"),
+  stats::setNames(std_choice_keys(ch),
                   vapply(ch, function(x) x$label[[lang]] %||% x$value, ""))
+}
+
+# The profile choice behind a form key (list with value, label and maybe rights)
+std_choice <- function(std, name, key) {
+  ch <- std$no_profile$choices[[name]]
+  hit <- match(key, std_choice_keys(ch))
+  if (is.na(hit)) NULL else ch[[hit]]
+}
+
+# Description of a peat data column, for table headings
+std_column_help <- function(std, name, lang = "no") {
+  h <- std$no_profile$columns[[name]]
+  h[[lang]] %||% h[["en"]] %||% std_field(std, name)$description %||% ""
 }
 
 std_default <- function(std, name, part = "peat_data") {

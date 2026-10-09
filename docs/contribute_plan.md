@@ -63,7 +63,7 @@ The app reads the **YAML** at runtime using the `yaml` package, which ships with
 ## Recommended approach (phased)
 
 ### Phase 1: Standardize and download (no infrastructure needed)
-Wizard steps:
+Wizard steps (steps 2 and 3 were swapped after the first test run, see the end of this plan):
 1. **Intro and consent:** what happens to the data, that taking part is optional, and a GDPR note.
 2. **Review points:** a map and an editable table, with derived fields filled in.
 3. **Measurement questions,** asked once for the whole dataset:
@@ -112,3 +112,15 @@ A curator merges reviewed submissions into a versioned national dataset with a D
   - an uploaded CSV that already contains `probeReachedBottom`
   - a multi-day survey
   - thousands of points
+
+## Feedback from the first test run (2026-10-09)
+Notes from stepping through the wizard in Docker, and how each is handled:
+1. **Depth sorted as text** in the review table. Number columns are now numbers, and the table opens sorted by depth, deepest first (stated above the table).
+2. **Clearer review instructions.** The step says what is required (only marking the points where the bottom was not reached, when that was the answer) and what is optional (dates and remarks per point). Column headings show a description on hover, and the same descriptions are listed under the table.
+3. **Select points on the map.** Clicking a point selects or deselects its row. Selected points are blue like selected rows, points where the bottom was not reached are orange, and a legend explains the colours.
+4. **Map beside the table** (map on the right). The coordinate columns are left out of the review table to make it narrower; they remain in the preview in the check step.
+5. **"Select all" and "Clear selection" buttons**, with a count of selected points. "Select all" respects the table's search box.
+6. **Measurement questions before the review** (old steps 2 and 3 swapped), so the table is complete when the user first sees it.
+7. **Shorter probe-type list:** torvsonde/jordsonde, skredsøkestang, kabelstang, torvbor (f.eks. russerbor), jordprøvetaker, annet. The other NE values stay valid in uploaded files.
+8. **NLOD 2.0 in the licence list.** It writes `license = Other` and `rights = NLOD 2.0`, as decided above, so the files stay valid under the NE standard.
+9. **Clickable step names** at the top. Jumping forward runs the same checks as "Neste" for every step it passes.

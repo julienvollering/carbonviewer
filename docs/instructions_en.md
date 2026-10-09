@@ -93,9 +93,9 @@ Your peat depth measurements are valuable beyond your own project: gathered toge
 A short wizard turns your points into files that follow the [Data Exchange Standard for Peat Surveys v1.0](https://github.com/NINAnor/carbonviewer/tree/main/standard) (Natural England) with a Norwegian profile:
 
 1. **About:** what happens to the data, and a note on personal data.
-2. **Review points:** a map and a table. Coordinates, depth and defaults are filled in. You can edit the date and remarks per point, and mark points where the probe did not reach the bottom of the peat.
-3. **Measurements:** survey date(s), who measured, probe type, whether the bottom of the peat was reached, depth resolution and how positions were measured.
-4. **Dataset:** title, organisation, a short description, contact email and licence.
+2. **Measurements:** survey date(s), who measured, probe type, whether the bottom of the peat was reached, depth resolution and how positions were measured.
+3. **Review points:** a table beside a map, with your answers filled in. If the probe did not reach the bottom at some points, mark those points here: select them by clicking rows in the table or points on the map. You can also edit the date and remarks per point. Hover over a column heading to see what it means.
+4. **Dataset:** title, organisation, a short description, contact email and licence (CC BY, CC0, CC BY-NC, NLOD 2.0 or other).
 5. **Check:** the data are checked against the standard, and a draft methods text and citation are suggested.
 6. **Download:** a zip file with the standardized data.
 
@@ -108,7 +108,7 @@ A short wizard turns your points into files that follow the [Data Exchange Stand
 
 Nothing is stored on the server; you decide what to do with the file. Columns in your CSV named like attributes of the standard (e.g. `probeReachedBottom`, `recordDate`, `locationRemarks`) are used as they are, and other columns are kept as extra columns. The test data cannot be contributed.
 
-***User Action:** Click on Contribute data. Follow the steps and click on Download standardized data.*
+***User Action:** Click on Contribute data. Follow the steps and click on Download standardized data. You can also click the step names at the top to move between steps.*
 
 ---
 

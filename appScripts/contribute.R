@@ -13,10 +13,17 @@ contribute_enabled <- function() isTRUE(getOption("carbonviewer.contribute", TRU
 contribute_app_version <- "CarbonViewer 1.0.0"
 
 # Wizard steps, in order
-contribute_steps <- c("intro", "review", "measure", "metadata", "validate", "download")
+contribute_steps <- c("intro", "measure", "review", "metadata", "validate", "download")
+
+# Columns of the review table (coordinates are on the map and in the final preview)
+contribute_review_columns <- c("point", "recordDate", "surfacePeatDepth", "probeReachedBottom",
+                               "peatDepthRemarks", "locationRemarks")
 
 # Columns the user can edit per row in the review table
 contribute_editable <- c("recordDate", "probeReachedBottom", "peatDepthRemarks", "locationRemarks")
+
+# Map colours; "selected" also colours the selected rows of the review table
+contribute_colors <- c(yes = "#555555", no = "#f0ad4e", selected = "#1f78b4")
 
 #####################
 # TRANSLATION       #
@@ -271,7 +278,8 @@ draft_citation <- function(meta, records) {
   year <- if (is.na(dates[2])) format(Sys.Date(), "%Y") else substr(dates[2], 1, 4)
   org <- if (is_blank(meta$organizationName %||% "")) "[organisation]" else meta$organizationName
   title <- if (is_blank(meta$title %||% "")) "[title]" else meta$title
-  lic <- if (is_blank(meta$license %||% "")) "" else paste0(" Licence: ", meta$license, ".")
+  lic_name <- if (identical(meta$license, "Other") && !is_blank(meta$rights %||% NA)) meta$rights else meta$license
+  lic <- if (is_blank(lic_name %||% "")) "" else paste0(" Licence: ", lic_name, ".")
   paste0(org, " (", year, "). ", title, ". Peat depth records, Data Exchange Standard for Peat Surveys v1.0.", lic)
 }
 
@@ -338,35 +346,83 @@ store_submission <- function(package_paths, manifest) {
   invisible(FALSE)
 }
 
+#################
+# TABLE HELPERS #
+#################
+
+# Records with number columns as numbers, so that tables sort them correctly
+as_display <- function(records, std) {
+  for (name in names(records)) {
+    if (identical(std_field(std, name)$type, "number")) {
+      records[[name]] <- suppressWarnings(as.numeric(records[[name]]))
+    }
+  }
+  records
+}
+
+# Table header whose cells show a description on hover. Long camelCase names
+# may wrap between words, so the table fits beside the map.
+dt_header <- function(columns, tips) {
+  tags$table(class = "display compact contribute-dt",
+             tags$thead(tags$tr(lapply(seq_along(columns), function(i) {
+               label <- gsub("([a-z])([A-Z])", "\\1<wbr>\\2", htmltools::htmlEscape(columns[i]))
+               tags$th(HTML(label), title = if (!is.na(tips[i]) && nzchar(tips[i])) tips[i])
+             }))))
+}
+
+# DataTables' own texts in Norwegian (NULL keeps the English defaults)
+dt_language <- function(lang) {
+  if (!identical(lang, "no")) return(NULL)
+  list(search = "Søk:", lengthMenu = "Vis _MENU_ rader",
+       info = "Viser _START_ til _END_ av _TOTAL_ rader", infoEmpty = "Ingen rader",
+       infoFiltered = "(filtrert fra _MAX_ rader)", zeroRecords = "Ingen treff",
+       paginate = list(previous = "Forrige side", `next` = "Neste side"))
+}
+
+contribute_css <- function(ns) {
+  sprintf(paste(
+    ".contribute-dt thead th[title] { text-decoration: underline dotted; cursor: help; }",
+    "#%1$s table.dataTable tbody tr.selected > * {",
+    "  box-shadow: inset 0 0 0 9999px %2$s !important; background-color: %2$s !important;",
+    "  color: #fff !important; }",
+    sep = "\n"), ns("table"), contribute_colors[["selected"]])
+}
+
 #############
 # MODULE UI #
 #############
 
 mod_contribute_ui <- function(id) {
   ns <- NS(id)
-  fluidRow(
-    box(width = 12,
-        uiOutput(ns("progress")),
-        tabsetPanel(
-          id = ns("wizard"), type = "hidden",
-          tabPanelBody("intro", uiOutput(ns("step_intro"))),
-          tabPanelBody("review",
-                       uiOutput(ns("step_review")),
-                       leafletOutput(ns("map"), height = 350),
-                       br(),
-                       uiOutput(ns("review_tools")),
-                       DT::DTOutput(ns("table"))),
-          tabPanelBody("measure", uiOutput(ns("step_measure"))),
-          tabPanelBody("metadata", uiOutput(ns("step_metadata"))),
-          tabPanelBody("validate",
-                       uiOutput(ns("step_validate")),
-                       uiOutput(ns("validate_drafts")),
-                       uiOutput(ns("validate_metadata")),
-                       DT::DTOutput(ns("preview"))),
-          tabPanelBody("download", uiOutput(ns("step_download")))
-        ),
-        hr(),
-        uiOutput(ns("nav"))
+  tagList(
+    tags$head(tags$style(HTML(contribute_css(ns)))),
+    fluidRow(
+      box(width = 12,
+          uiOutput(ns("progress")),
+          tabsetPanel(
+            id = ns("wizard"), type = "hidden",
+            tabPanelBody("intro", uiOutput(ns("step_intro"))),
+            tabPanelBody("measure", uiOutput(ns("step_measure"))),
+            tabPanelBody("review",
+                         uiOutput(ns("step_review")),
+                         fluidRow(
+                           column(7,
+                                  uiOutput(ns("review_tools")),
+                                  DT::DTOutput(ns("table")),
+                                  uiOutput(ns("review_columns"))),
+                           column(5, leafletOutput(ns("map"), height = 560))
+                         )),
+            tabPanelBody("metadata", uiOutput(ns("step_metadata"))),
+            tabPanelBody("validate",
+                         uiOutput(ns("step_validate")),
+                         uiOutput(ns("validate_drafts")),
+                         uiOutput(ns("validate_metadata")),
+                         DT::DTOutput(ns("preview"))),
+            tabPanelBody("download", uiOutput(ns("step_download")))
+          ),
+          hr(),
+          uiOutput(ns("nav"))
+      )
     )
   )
 }
@@ -392,15 +448,20 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
     step <- reactiveVal("intro")
     invited <- reactiveVal(FALSE)
     edits <- reactiveVal(NULL)
+    # Selected rows, shared by the review table, the map and the buttons
+    selected <- reactiveVal(integer(0))
     drafts <- reactiveValues(methods = NULL, bibliographicCitation = NULL)
 
     has_points <- reactive(!is.null(points()) && nrow(points()) > 0)
     is_test <- reactive(identical(upload_state(), "test"))
     ready <- reactive(has_points() && !is_test())
+    # The "reached the bottom?" question is skipped when the upload has its own column
+    asks_bottom <- reactive(has_points() && !upload_has(points(), "probeReachedBottom", complete = FALSE))
 
     # New data: start over
     observeEvent(points(), {
       edits(empty_edits(nrow(points())))
+      selected(integer(0))
       step("intro")
     })
 
@@ -466,18 +527,32 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
       apply_edits(standardize_points(points(), answers(), std), edits())
     })
 
-    meta_answers <- reactive(list(
-      title = input$title,
-      organizationName = input$organizationName,
-      abstract = input$abstract,
-      purpose = input$purpose,
-      contactElectronicMailAddress = input$contactElectronicMailAddress,
-      license = input$license,
-      rights = input$rights,
-      geographicDescription = input$geographicDescription,
-      methods = input$methods,
-      bibliographicCitation = input$bibliographicCitation
-    ))
+    # The licence list offers profile choices: NLOD 2.0 is written as "Other" + rights
+    license_terms <- reactive({
+      key <- input$license
+      if (is.null(key) || key == "") return(list(license = NA_character_, rights = NA_character_))
+      choice <- std_choice(std, "license", key)
+      list(license = choice$value %||% key,
+           rights = choice$rights %||% (if (identical(key, "Other")) input$rights else NA_character_))
+    })
+
+    meta_answers <- reactive({
+      lic <- license_terms()
+      m <- list(
+        title = input$title,
+        organizationName = input$organizationName,
+        abstract = input$abstract,
+        purpose = input$purpose,
+        contactElectronicMailAddress = input$contactElectronicMailAddress,
+        license = lic$license,
+        rights = lic$rights,
+        geographicDescription = input$geographicDescription
+      )
+      # Drafts stand in until the check step has shown its text boxes
+      m$methods <- input$methods %||% draft_methods(answers(), records(), std, lang())
+      m$bibliographicCitation <- input$bibliographicCitation %||% draft_citation(m, records())
+      m
+    })
 
     metadata <- reactive(build_metadata(meta_answers(), records(), std))
 
@@ -544,18 +619,63 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
 
     validators <- list(intro = iv_intro, measure = iv_measure, metadata = iv_meta)
 
+    # Problems that keep the user from leaving a step (NULL when there are none)
+    step_problem <- function(s) {
+      iv <- validators[[s]]
+      if (!is.null(iv)) {
+        iv$enable()
+        if (!iv$is_valid()) return(tr("Noen felt må fylles ut eller rettes."))
+      }
+      if (s == "review" && asks_bottom() && identical(input$bottom, "some") &&
+          !any(records()$probeReachedBottom %in% "No")) {
+        return(tr("Du svarte at dere ikke nådde bunnen i noen punkter, men ingen punkter er merket. Velg punktene og trykk «Nådde ikke bunnen», eller endre svaret i steg 2."))
+      }
+      if (s == "validate" && any(issues()$level == "error")) {
+        return(tr("Noe må rettes før du kan laste ned. Gå tilbake og rett feltene nedenfor."))
+      }
+      NULL
+    }
+
+    # Going forward runs the checks of every step passed, as "Neste" does
+    go_to <- function(target) {
+      if (!ready() || !target %in% contribute_steps) return(invisible())
+      from <- match(step(), contribute_steps)
+      to <- match(target, contribute_steps)
+      if (to > from) {
+        for (s in contribute_steps[from:(to - 1)]) {
+          problem <- step_problem(s)
+          if (!is.null(problem)) {
+            step(s)
+            showNotification(problem, type = "warning")
+            return(invisible())
+          }
+        }
+      }
+      step(target)
+    }
+
     #################
     # NAVIGATION    #
     #################
+    # Step names double as links
     output$progress <- renderUI({
-      labels <- c(intro = tr("Om bidraget"), review = tr("Se over punktene"),
-                  measure = tr("Om målingene"), metadata = tr("Om datasettet"),
+      labels <- c(intro = tr("Om bidraget"), measure = tr("Om målingene"),
+                  review = tr("Se over punktene"), metadata = tr("Om datasettet"),
                   validate = tr("Kontroll"), download = tr("Last ned"))
       cur <- match(step(), contribute_steps)
       tags$p(lapply(seq_along(contribute_steps), function(i) {
-        lab <- paste0(i, ". ", labels[[contribute_steps[i]]])
-        tagList(if (i == cur) tags$b(lab) else tags$span(lab, style = "color:#888"),
-                if (i < length(contribute_steps)) " → ")
+        s <- contribute_steps[i]
+        lab <- paste0(i, ". ", labels[[s]])
+        item <- if (i == cur) {
+          tags$b(lab)
+        } else if (ready()) {
+          tags$a(href = "#", lab,
+                 onclick = sprintf("Shiny.setInputValue('%s', '%s', {priority: 'event'}); return false;",
+                                   ns("goto"), s))
+        } else {
+          tags$span(lab, style = "color:#888")
+        }
+        tagList(item, if (i < length(contribute_steps)) " → ")
       }))
     })
 
@@ -565,7 +685,7 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
         !(step() == "validate" && any(issues()$level == "error"))
       tagList(
         if (i > 1) actionButton(ns("back"), tr("Tilbake"), icon = icon("arrow-left")),
-        if (i < length(contribute_steps) && can_next)
+        if (can_next)
           actionButton(ns("next_step"), tr("Neste"), icon = icon("arrow-right"), class = "btn-primary")
       )
     })
@@ -576,18 +696,11 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
     })
 
     observeEvent(input$next_step, {
-      req(ready())
-      iv <- validators[[step()]]
-      if (!is.null(iv)) {
-        iv$enable()
-        if (!iv$is_valid()) {
-          showNotification(tr("Noen felt må fylles ut eller rettes."), type = "warning")
-          return()
-        }
-      }
       i <- match(step(), contribute_steps)
-      step(contribute_steps[i + 1])
+      if (i < length(contribute_steps)) go_to(contribute_steps[i + 1])
     })
+
+    observeEvent(input$goto, go_to(input$goto))
 
     #################
     # 1. INTRO      #
@@ -617,51 +730,165 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
     })
 
     #################
-    # 2. REVIEW     #
+    # 2. MEASURE    #
+    #################
+    output$step_measure <- renderUI({
+      l <- lang()
+      pts <- if (has_points()) points()
+      has_date <- !is.null(pts) && upload_has(pts, "recordDate")
+      has_surveyor <- !is.null(pts) && upload_has(pts, "surveyor")
+      pos <- std$no_profile$positioning
+      pos_choices <- stats::setNames(vapply(pos, `[[`, "", "id"),
+                                     vapply(pos, function(p) p$label[[l]], ""))
+      d <- val("recordDate", c(NA, NA))
+
+      tagList(
+        h3(tr("Om målingene")),
+        p(tr("Svarene gjelder alle punktene. I neste steg kan du se over punktene og rette enkeltpunkter.")),
+        fluidRow(
+          column(6,
+                 # NA dates give an empty field (Shiny warns about them)
+                 suppressWarnings(
+                   dateRangeInput(ns("recordDate"),
+                                  paste(std_label(std, "recordDate", l), if (!has_date) "*"),
+                                  start = d[1], end = d[2], format = "yyyy-mm-dd",
+                                  weekstart = 1, language = if (l == "no") "nb" else "en",
+                                  separator = "–", width = "100%")),
+                 std_help_text(std, "recordDate", l),
+                 if (has_date) helpText(tr("Filen din har allerede dato for alle punkter. Den brukes.")),
+                 std_input(std, "surveyor", ns, l, val("surveyor"), required = !has_surveyor),
+                 std_input(std, "probeType", ns, l, val("probeType")),
+                 std_input(std, "peatDepthResolution", ns, l,
+                           val("peatDepthResolution", std_default(std, "peatDepthResolution")),
+                           required = TRUE)
+          ),
+          column(6,
+                 if (!is.null(pts) && !asks_bottom()) {
+                   tagList(tags$label(std_label(std, "probeReachedBottom", l)),
+                           helpText(tr("Filen din har allerede en kolonne probeReachedBottom. Verdiene brukes; tomme eller ukjente verdier blir «No».")))
+                 } else {
+                   tagList(
+                     radioButtons(ns("bottom"), paste(std_label(std, "probeReachedBottom", l), "*"),
+                                  choiceNames = list(tr("Ja, i alle punktene"),
+                                                     tr("Nei, eller usikker, i noen punkter"),
+                                                     tr("Usikker for alle punktene")),
+                                  choiceValues = list("all", "some", "unsure"),
+                                  selected = val("bottom", character(0)), width = "100%"),
+                     std_help_text(std, "probeReachedBottom", l),
+                     conditionalPanel(sprintf("input['%s'] == 'some'", ns("bottom")),
+                                      div(class = "alert alert-info",
+                                          tr("Alle punktene får «Yes» foreløpig. I neste steg merker du punktene der dere ikke nådde bunnen.")))
+                   )
+                 },
+                 radioButtons(ns("positioning"), paste(std_label(std, "coordinateUncertainty", l), "*"),
+                              choices = pos_choices, selected = val("positioning", character(0)),
+                              width = "100%"),
+                 conditionalPanel(sprintf("input['%s'] == 'custom'", ns("positioning")),
+                                  numericInput(ns("uncertainty_custom"), tr("Usikkerhet (m)"),
+                                               value = val("uncertainty_custom", NA), min = 0, step = 0.1)),
+                 std_help_text(std, "coordinateUncertainty", l),
+                 std_input(std, "peatDepthRemarks", ns, l, val("peatDepthRemarks"), multiline = TRUE)
+          )
+        )
+      )
+    })
+
+    #################
+    # 3. REVIEW     #
     #################
     output$step_review <- renderUI({
       req(has_points())
+      must_mark <- asks_bottom() && identical(input$bottom, "some")
+      n_no <- sum(records()$probeReachedBottom %in% "No")
+      extras <- contribute_extra_columns(points(), std)
       tagList(
         h3(tr("Se over punktene")),
-        p(sprintf(tr("%s punkter. Koordinater, dybde og standardverdier er fylt inn. Du kan rette dato og merknader per punkt ved å dobbeltklikke i tabellen."),
+        p(sprintf(tr("Tabellen viser de %s punktene slik de blir lagret, med svarene fra forrige steg fylt inn. Den er sortert etter torvdybde, dypest først. Klikk på en kolonneoverskrift for å sortere på en annen måte."),
                   nrow(points()))),
-        if (length(contribute_extra_columns(points(), std))) {
-          p(tags$i(paste(tr("Ekstra kolonner fra filen din tas med:"),
-                         paste(contribute_extra_columns(points(), std), collapse = ", "))))
+        if (must_mark && n_no == 0) {
+          div(class = "alert alert-warning", tags$b(tr("Påkrevd:")), " ",
+              tr("Du svarte at dere ikke nådde bunnen i noen punkter. Velg disse punktene i tabellen eller på kartet, og trykk «Nådde ikke bunnen»."))
+        } else if (must_mark) {
+          div(class = "alert alert-success", tags$b(tr("Påkrevd:")), " ",
+              sprintf(if (n_no == 1) tr("%s punkt er merket som «Nådde ikke bunnen». Merk flere om nødvendig, eller gå videre.")
+                      else tr("%s punkter er merket som «Nådde ikke bunnen». Merk flere om nødvendig, eller gå videre."),
+                      n_no))
+        } else {
+          p(tags$b(tr("Påkrevd:")), " ", tr("Ingenting. Gå videre hvis alt ser riktig ut."))
+        },
+        tags$b(tr("Valgfritt:")),
+        tags$ul(
+          tags$li(tr("Rett dato eller skriv merknader for enkeltpunkter: dobbeltklikk på en celle i kolonnene recordDate, peatDepthRemarks eller locationRemarks.")),
+          tags$li(tr("Endre om bunnen ble nådd: velg punkter ved å klikke på rader i tabellen eller på punkter i kartet, og bruk knappene over tabellen.")),
+          tags$li(tr("Hold musepekeren over en kolonneoverskrift for å se hva kolonnen betyr, eller åpne «Hva betyr kolonnene?» under tabellen."))
+        ),
+        if (length(extras)) {
+          p(tags$i(paste(tr("Ekstra kolonner fra filen din tas med:"), paste(extras, collapse = ", "))))
         }
       )
     })
 
     output$review_tools <- renderUI({
       req(has_points())
-      some <- identical(input$bottom, "some")
-      div(
-        if (some) div(class = "alert alert-info",
-                      tr("Merk punktene der dere ikke nådde bunnen: velg radene i tabellen og trykk «Nådde ikke bunnen».")),
-        actionButton(ns("mark_no"), tr("Nådde ikke bunnen"), icon = icon("arrow-down")),
-        actionButton(ns("mark_yes"), tr("Nådde bunnen"), icon = icon("check")),
-        actionButton(ns("clear_edits"), tr("Fjern endringer i tabellen"), icon = icon("rotate-left")),
-        helpText(tr("Knappene gjelder de valgte radene. Gule punkter på kartet nådde ikke bunnen."))
+      tagList(
+        div(style = "margin-bottom: 6px;",
+            actionButton(ns("select_all"), tr("Velg alle"), icon = icon("check-double"), class = "btn-sm"),
+            actionButton(ns("select_none"), tr("Fjern valg"), icon = icon("xmark"), class = "btn-sm"),
+            tags$span(style = "margin-left: 8px;", textOutput(ns("selection_count"), inline = TRUE))),
+        div(style = "margin-bottom: 10px;",
+            tags$span(tr("Valgte punkter:")), " ",
+            actionButton(ns("mark_no"), tr("Nådde ikke bunnen"), icon = icon("arrow-down"), class = "btn-sm"),
+            actionButton(ns("mark_yes"), tr("Nådde bunnen"), icon = icon("check"), class = "btn-sm"),
+            actionLink(ns("clear_edits"), tr("Angre alle endringer i tabellen"), icon = icon("rotate-left"),
+                       style = "margin-left: 12px;"))
       )
     })
 
-    review_columns <- c("recordDate", "surfacePeatDepth", "probeReachedBottom",
-                        "peatDepthRemarks", "locationRemarks",
-                        "latitude", "longitude", "easting", "northing")
+    output$selection_count <- renderText({
+      req(has_points())
+      sprintf(tr("%s av %s punkter valgt"), length(selected()), nrow(points()))
+    })
+
+    # Hover text of the table headings
+    column_tips <- function(columns) {
+      unname(vapply(columns, function(name) {
+        if (name == "point") tr("Punktnummer: rekkefølgen i CSV-filen din.") else std_column_help(std, name, lang())
+      }, ""))
+    }
+
+    output$review_columns <- renderUI({
+      req(has_points())
+      tips <- column_tips(contribute_review_columns)
+      tags$details(style = "margin-top: 10px;",
+                   tags$summary(tr("Hva betyr kolonnene?")),
+                   tags$dl(lapply(seq_along(tips), function(i) {
+                     tagList(tags$dt(tags$code(contribute_review_columns[i])), tags$dd(tips[i]))
+                   })))
+    })
 
     review_data <- reactive({
       r <- records()
-      cbind(point = seq_len(nrow(r)), r[, review_columns, drop = FALSE])
+      cbind(point = seq_len(nrow(r)),
+            as_display(r[, setdiff(contribute_review_columns, "point"), drop = FALSE], std))
     })
 
     output$table <- DT::renderDT({
       req(has_points())
       points()
+      l <- lang()
       d <- isolate(review_data())
-      locked <- which(!names(d) %in% contribute_editable) - 1
-      DT::datatable(d, rownames = FALSE, selection = "multiple",
-                    editable = list(target = "cell", disable = list(columns = locked)),
-                    options = list(pageLength = 25, scrollX = TRUE))
+      sel <- isolate(selected())
+      sel <- sel[sel <= nrow(d)]
+      DT::datatable(
+        d, rownames = FALSE,
+        container = dt_header(names(d), column_tips(names(d))),
+        selection = list(mode = "multiple", selected = if (length(sel)) sel),
+        editable = list(target = "cell",
+                        disable = list(columns = which(!names(d) %in% contribute_editable) - 1)),
+        options = list(pageLength = 15, lengthMenu = c(15, 50, 100, 500), scrollX = TRUE,
+                       autoWidth = FALSE,
+                       order = list(list(match("surfacePeatDepth", names(d)) - 1, "desc")),
+                       language = dt_language(l)))
     })
 
     table_proxy <- DT::dataTableProxy("table")
@@ -690,114 +917,92 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
       edits(e)
     })
 
+    # Table clicks, map clicks and the buttons all go through `selected`
+    set_selected <- function(rows, push = TRUE) {
+      rows <- sort(unique(as.integer(rows)))
+      selected(rows)
+      if (push) DT::selectRows(table_proxy, if (length(rows)) rows)
+    }
+    observeEvent(input$table_rows_selected, set_selected(input$table_rows_selected, push = FALSE),
+                 ignoreNULL = FALSE)
+    # "Select all" respects the table's search box
+    observeEvent(input$select_all, set_selected(input$table_rows_all %||% seq_len(nrow(points()))))
+    observeEvent(input$select_none, set_selected(integer(0)))
+    observeEvent(input$map_marker_click, {
+      row <- suppressWarnings(as.integer(sub("^sel_", "", input$map_marker_click$id)))
+      req(!is.na(row))
+      rows <- selected()
+      set_selected(if (row %in% rows) setdiff(rows, row) else c(rows, row))
+    })
+
     mark_bottom <- function(value) {
-      rows <- input$table_rows_selected
+      rows <- selected()
       if (length(rows) == 0) {
-        showNotification(tr("Velg en eller flere rader i tabellen først."), type = "message")
+        showNotification(tr("Velg ett eller flere punkter først."), type = "message")
         return()
       }
       e <- edits()
       e[rows, "probeReachedBottom"] <- value
       edits(e)
+      # Clear the selection so that the new colours show on the map
+      set_selected(integer(0))
     }
     observeEvent(input$mark_no, mark_bottom("No"))
     observeEvent(input$mark_yes, mark_bottom("Yes"))
     observeEvent(input$clear_edits, edits(empty_edits(nrow(points()))))
 
-    add_points <- function(map, r) {
-      ll <- data.frame(lat = as.numeric(r$latitude), lon = as.numeric(r$longitude))
-      no <- r$probeReachedBottom %in% "No"
+    point_labels <- function(r) {
+      paste0("#", seq_len(nrow(r)), ": ", r$surfacePeatDepth, " cm",
+             ifelse(r$probeReachedBottom %in% "No", paste0(" (", tr("nådde ikke bunnen"), ")"), ""))
+    }
+
+    draw_points <- function(map, r) {
       map %>%
         clearGroup("points") %>%
-        addCircleMarkers(lng = ll$lon, lat = ll$lat, group = "points", radius = 4,
-                         stroke = TRUE, weight = 1, color = "black", fillOpacity = 0.8,
-                         fillColor = ifelse(no, "#f0ad4e", "#3c8dbc"),
-                         label = paste0("#", seq_len(nrow(r)), ": ", r$surfacePeatDepth, " cm"))
+        addCircleMarkers(lng = as.numeric(r$longitude), lat = as.numeric(r$latitude),
+                         layerId = as.character(seq_len(nrow(r))), group = "points",
+                         radius = 5, stroke = TRUE, weight = 1, color = "black", opacity = 1,
+                         fillOpacity = 0.9, label = point_labels(r),
+                         fillColor = unname(ifelse(r$probeReachedBottom %in% "No",
+                                                   contribute_colors[["no"]], contribute_colors[["yes"]])))
+    }
+
+    # Selected points are drawn on top, with their own ids so both layers stay
+    draw_selected <- function(map, r, rows) {
+      map <- map %>% clearGroup("selected")
+      rows <- rows[rows <= nrow(r)]
+      if (length(rows) == 0) return(map)
+      map %>%
+        addCircleMarkers(lng = as.numeric(r$longitude[rows]), lat = as.numeric(r$latitude[rows]),
+                         layerId = paste0("sel_", rows), group = "selected",
+                         radius = 7, stroke = TRUE, weight = 2, color = "black", opacity = 1,
+                         fillOpacity = 1, fillColor = contribute_colors[["selected"]],
+                         label = point_labels(r)[rows])
     }
 
     output$map <- renderLeaflet({
       req(has_points())
+      lang()
+      r <- isolate(records())
       m <- leaflet() %>% addTiles()
       if (!is.null(shape())) {
-        m <- m %>% addPolygons(data = sf::st_transform(shape(), 4326), fillOpacity = 0.2, weight = 1.2)
+        m <- m %>% addPolygons(data = sf::st_transform(shape(), 4326), fillOpacity = 0.1, weight = 1.5)
       }
-      add_points(m, isolate(records()))
+      m <- m %>% addLegend("bottomright", opacity = 0.9,
+                           colors = unname(contribute_colors[c("yes", "no", "selected")]),
+                           labels = c(tr("Nådde bunnen"), tr("Nådde ikke bunnen"), tr("Valgt")))
+      draw_selected(draw_points(m, r), r, isolate(selected()))
     })
 
+    # Recolour after edits (and redraw the selection on top), or redraw the selection
     observe({
       r <- records()
-      add_points(leafletProxy("map"), r)
+      draw_selected(draw_points(leafletProxy("map"), r), r, isolate(selected()))
     })
-
-    #################
-    # 3. MEASURE    #
-    #################
-    output$step_measure <- renderUI({
-      l <- lang()
-      pts <- if (has_points()) points()
-      has_bottom <- !is.null(pts) && upload_has(pts, "probeReachedBottom", complete = FALSE)
-      has_date <- !is.null(pts) && upload_has(pts, "recordDate")
-      has_surveyor <- !is.null(pts) && upload_has(pts, "surveyor")
-      pos <- std$no_profile$positioning
-      pos_choices <- stats::setNames(vapply(pos, `[[`, "", "id"),
-                                     vapply(pos, function(p) p$label[[l]], ""))
-      d <- val("recordDate", c(NA, NA))
-
-      tagList(
-        h3(tr("Om målingene")),
-        p(tr("Svarene gjelder alle punktene. Du kan rette enkeltpunkter i tabellen i steg 2.")),
-        fluidRow(
-          column(6,
-                 # NA dates give an empty field (Shiny warns about them)
-                 suppressWarnings(
-                   dateRangeInput(ns("recordDate"),
-                                  paste(std_label(std, "recordDate", l), if (!has_date) "*"),
-                                  start = d[1], end = d[2], format = "yyyy-mm-dd",
-                                  weekstart = 1, language = if (l == "no") "nb" else "en",
-                                  separator = "–", width = "100%")),
-                 std_help_text(std, "recordDate", l),
-                 if (has_date) helpText(tr("Filen din har allerede dato for alle punkter. Den brukes.")),
-                 std_input(std, "surveyor", ns, l, val("surveyor"), required = !has_surveyor),
-                 std_input(std, "probeType", ns, l, val("probeType")),
-                 std_input(std, "peatDepthResolution", ns, l,
-                           val("peatDepthResolution", std_default(std, "peatDepthResolution")),
-                           required = TRUE)
-          ),
-          column(6,
-                 if (has_bottom) {
-                   tagList(tags$label(std_label(std, "probeReachedBottom", l)),
-                           helpText(tr("Filen din har allerede en kolonne probeReachedBottom. Verdiene brukes; tomme eller ukjente verdier blir «No».")))
-                 } else {
-                   tagList(
-                     radioButtons(ns("bottom"), paste(std_label(std, "probeReachedBottom", l), "*"),
-                                  choiceNames = list(tr("Ja, i alle punktene"),
-                                                     tr("Nei, eller usikker, i noen punkter"),
-                                                     tr("Usikker for alle punktene")),
-                                  choiceValues = list("all", "some", "unsure"),
-                                  selected = val("bottom", character(0)), width = "100%"),
-                     std_help_text(std, "probeReachedBottom", l),
-                     conditionalPanel(sprintf("input['%s'] == 'some'", ns("bottom")),
-                                      div(class = "alert alert-info",
-                                          tr("Alle punkter får «Yes». Gå tilbake til steg 2 og merk punktene der dere ikke nådde bunnen."),
-                                          br(),
-                                          actionLink(ns("goto_review"), tr("Gå til tabellen"))))
-                   )
-                 },
-                 radioButtons(ns("positioning"), paste(std_label(std, "coordinateUncertainty", l), "*"),
-                              choices = pos_choices, selected = val("positioning", character(0)),
-                              width = "100%"),
-                 conditionalPanel(sprintf("input['%s'] == 'custom'", ns("positioning")),
-                                  numericInput(ns("uncertainty_custom"), tr("Usikkerhet (m)"),
-                                               value = val("uncertainty_custom", NA), min = 0, step = 0.1)),
-                 std_help_text(std, "coordinateUncertainty", l),
-                 std_input(std, "peatDepthRemarks", ns, l, val("peatDepthRemarks"), multiline = TRUE)
-          )
-        )
-      )
+    observe({
+      rows <- selected()
+      draw_selected(leafletProxy("map"), isolate(records()), rows)
     })
-
-    observeEvent(input$goto_review, step("review"))
-
 
     #################
     # 4. METADATA   #
@@ -902,8 +1107,11 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
 
     output$preview <- DT::renderDT({
       req(has_points(), step() == "validate")
-      DT::datatable(records(), rownames = FALSE, selection = "none",
-                    options = list(pageLength = 10, scrollX = TRUE, dom = "tip"))
+      d <- as_display(records(), std)
+      DT::datatable(d, rownames = FALSE, selection = "none",
+                    container = dt_header(names(d), column_tips(names(d))),
+                    options = list(pageLength = 10, scrollX = TRUE, dom = "tip",
+                                   language = dt_language(lang())))
     })
 
     #################
