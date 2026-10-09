@@ -7,6 +7,8 @@
 - optional "Contribute data" wizard: turns the uploaded peat depths into files following the
   Data Exchange Standard for Peat Surveys v1.0 (Natural England) with a Norwegian profile, for download
     - new `standard/` folder with the machine-readable standard and the Norwegian profile
+    - the corrected profile writes yes/no attributes as `true`/`false` (TDWG Boolean Controlled Vocabulary, change C7)
+    - works right after the upload, without the volume calculation
     - new dependencies: `shinyvalidate`, `yaml`
 
 **Changed**
@@ -19,6 +21,7 @@
     - all coordinates are transformed to `ETRS89 UTM zone 33N` (EPSG:25833).
     - update default to `ETRS89 UTM zone 33N` (EPSG:25833) 
 - new order UI-elements in the sidebar
+- reading the uploaded zip moved into `read_dataset_zip()` (`global.R`), shared by the volume calculation and the "Contribute data" wizard
 - updated documentation and inline comments
 
 **Removed**

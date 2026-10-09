@@ -31,11 +31,11 @@
     ├── exploration.R       # IDW interpolation (stand-alone)
 ├── standard                # Data Exchange Standard for Peat Surveys v1.0 (read by the app at runtime)
     ├── Data Exchange Standard for Peat Surveys v1.0.pdf  # Source document (Natural England)
-    ├── peat_standard_v1.0.yaml          # Corrected machine-readable profile (1.0-corr.1), authoritative
+    ├── peat_standard_v1.0.yaml          # Corrected machine-readable profile (1.0-corr.2), authoritative
     ├── peat_standard_no_profile.yaml    # Norwegian overlay: NO/EN labels, defaults, licence choices
     ├── peat_data_attributes.csv         # Flat view of the peat data attributes
     ├── peat_metadata_terms.csv          # Flat view of the metadata terms
-    ├── peat_standard_changes.csv        # Corrections C1-C6 against the published v1.0
+    ├── peat_standard_changes.csv        # Changes C1-C7 against the published v1.0
 ├── test                    # Test data
     ├── csv_only.zip
     ├── invalid_csv.zip
@@ -67,4 +67,5 @@
 - Optional; switch it off with `options(carbonviewer.contribute = FALSE)` in `app.R`.
 - Code in `appScripts/contribute.R` (module + helpers) and `appScripts/standard.R` (standard loader + validator).
 - The app reads `standard/peat_standard_v1.0.yaml` and `standard/peat_standard_no_profile.yaml` at runtime. With docker compose, `./standard` is mounted into the container.
+- The module reads the uploaded zip itself with `read_dataset_zip()` (`appScripts/global.R`, also used by the volume calculation), so it works without the volume calculation.
 - Phase 1 only standardizes and offers a download; `store_submission()` is a stub for a later submission step. See `docs/contribute_plan.md`.

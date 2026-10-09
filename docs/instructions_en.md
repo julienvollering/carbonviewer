@@ -88,13 +88,13 @@ The zip-file contains the following files:
 
 ### 5. Contribute Your Peat Depths (optional)
 
-Your peat depth measurements are valuable beyond your own project: gathered together, they can become training data for national peat mapping. After a successful calculation with your own data, CarbonViewer asks whether you want to contribute. You can also open **Contribute data** in the sidebar at any time.
+Your peat depth measurements are valuable beyond your own project: gathered together, they can become training data for national peat mapping. You do not need to calculate the volume first: upload your zip file and open **Contribute data** in the sidebar. After a calculation with your own data, CarbonViewer also asks whether you want to contribute.
 
 A short wizard turns your points into files that follow the [Data Exchange Standard for Peat Surveys v1.0](https://github.com/NINAnor/carbonviewer/tree/main/standard) (Natural England) with a Norwegian profile:
 
 1. **About:** what happens to the data, and a note on personal data.
-2. **Measurements:** survey date(s), who measured, probe type, whether the bottom of the peat was reached, depth resolution and how positions were measured.
-3. **Review points:** a table beside a map, with your answers filled in. If the probe did not reach the bottom at some points, mark those points here: select them by clicking rows in the table or points on the map. You can also edit the date and remarks per point. Hover over a column heading to see what it means.
+2. **Measurements:** survey date(s), who measured, probe type, whether the bottom of the peat was reached, depth resolution (1, 5 or 10 cm, or another value) and how positions were measured.
+3. **Review points:** a table beside a map, with your answers filled in. If the probe did not reach the bottom at some points, mark those points here: select them by clicking rows in the table or points on the map. **Move selected to top** brings the selected points to the top of the table, so you can edit them there. You can also edit the date and remarks per point. Hover over a column heading to see what it means.
 4. **Dataset:** title, organisation, a short description, contact email and licence (CC BY, CC0, CC BY-NC, NLOD 2.0 or other).
 5. **Check:** the data are checked against the standard, and a draft methods text and citation are suggested.
 6. **Download:** a zip file with the standardized data.
@@ -106,7 +106,7 @@ A short wizard turns your points into files that follow the [Data Exchange Stand
 └── README.txt         # which standard and profile the files follow
 ```
 
-Nothing is stored on the server; you decide what to do with the file. Columns in your CSV named like attributes of the standard (e.g. `probeReachedBottom`, `recordDate`, `locationRemarks`) are used as they are, and other columns are kept as extra columns. The test data cannot be contributed.
+Nothing is stored on the server; you decide what to do with the file. Columns in your CSV named like attributes of the standard (e.g. `probeReachedBottom`, `recordDate`, `locationRemarks`) are used as they are, and other columns are kept as extra columns. Yes/no values such as `probeReachedBottom` are written as `true`/`false` ([TDWG Boolean Controlled Vocabulary](https://tag.tdwg.org/boolean/)). The test data cannot be contributed.
 
 ***User Action:** Click on Contribute data. Follow the steps and click on Download standardized data. You can also click the step names at the top to move between steps.*
 

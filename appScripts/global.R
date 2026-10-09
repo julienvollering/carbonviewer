@@ -203,10 +203,20 @@ print_error_csv_columns <- function(){
 print_corrupt_shp <- function(){
   showModal(modalDialog(
     title = "SHP input error",
-    "The SHP file uploaded is corrupt. Please make sure that it contains the polygon(s) of the area of interest. 
+    "The SHP file uploaded is corrupt. Please make sure that it contains the polygon(s) of the area of interest.
           In any doubts, refer to the README. The session is reloaded.",
     easyClose = TRUE
   ))
+}
+
+# Error message for a problem found by read_dataset_zip()
+print_dataset_error <- function(error){
+  switch(error,
+         no_shp = print_no_shp(),
+         no_prj = print_no_prj(),
+         no_csv = print_no_csv(),
+         corrupt_shp = print_corrupt_shp(),
+         print_error_csv_columns())
 }
 
 # Error message if files are not opened properly
@@ -247,6 +257,70 @@ transform_to_sf <- function(df) {
     }, error = function(e) {})
   }
   stop("Could not transform the file with any of the following coordinates: ", cols)
+}
+
+####################
+# READ THE DATASET #
+####################
+
+#' Read an uploaded dataset: a zip with the area polygon(s) (.shp + .prj) and a
+#' CSV with the peat depth points (x, y and torvdybde_cm or peat_depth_cm)
+#'
+#' Used by the volume calculation and by the "Contribute data" module, which
+#' reads the zip as soon as it is uploaded.
+#'
+#' @param zip_path path of the zip file (NULL: only read what is already in exdir).
+#' @param exdir folder to unzip into.
+#' @return list(shape, points), both in EPSG:25833, or list(error = code) where
+#'   code is "no_shp", "no_prj", "no_csv", "corrupt_shp" or "bad_csv".
+read_dataset_zip <- function(zip_path, exdir, target_crs = 25833){
+  if (!is.null(zip_path)) unzip(zip_path, exdir = exdir)
+  print(list.files(exdir, recursive = TRUE))
+
+  shp_file <- list.files(exdir, pattern = '.shp$', recursive = TRUE)
+  prj_file <- list.files(exdir, pattern = '.prj$', recursive = TRUE)
+  csv_file <- list.files(exdir, pattern = '.csv$', recursive = TRUE)
+
+  # Check if there is both a shapefile and a CSV
+  if (length(shp_file) == 0) return(list(error = "no_shp"))
+  if (length(prj_file) == 0) return(list(error = "no_prj"))
+  if (length(csv_file) == 0) return(list(error = "no_csv"))
+
+  shp <- tryCatch(st_read(paste0(exdir, "/", shp_file)), error = function(e) NULL)
+  if (is.null(shp)) return(list(error = "corrupt_shp"))
+
+  # If the shapefile has no CRS, we assume it is EPSG:25833 as specified in the
+  # README. The points are in the same CRS as the shapefile.
+  input_crs <- st_crs(shp)
+  if (is.na(input_crs)) {
+    print("The shapefile does not contain a projection (CRS)--> assigning the default CRS 'EPSG:25833'")
+    shp <- shp %>% st_set_crs(target_crs)
+    input_crs <- st_crs(target_crs)
+  }
+  else {
+    print("The shapefile has a projection (CRS) --> Converting to 'EPSG:25833'")
+    shp <- shp %>% st_transform(target_crs)
+  }
+
+  df <- tryCatch(open_csv(paste0(exdir, "/", csv_file)), error = function(e) NULL)
+  if (is.null(df)) return(list(error = "bad_csv"))
+  names(df) <- tolower(names(df))
+
+  # If name is peat_depth_cm change to torvdybde_cm
+  if ("peat_depth_cm" %in% names(df)){
+    names(df)[names(df) == "peat_depth_cm"] <- "torvdybde_cm"
+  }
+
+  # Check that the CSV contains the necessary columns (x,y, torvdybde_cm)
+  necessary_columns <- c("x","y", "torvdybde_cm")
+  if (sum(names(df) %in% necessary_columns) != 3) return(list(error = "bad_csv"))
+  print(head(df))
+
+  points <- tryCatch(transform_to_sf(df) %>% st_set_crs(input_crs) %>% st_transform(target_crs),
+                     error = function(e) NULL)
+  if (is.null(points)) return(list(error = "bad_csv"))
+
+  list(shape = shp, points = points)
 }
 
 

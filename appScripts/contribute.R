@@ -4,7 +4,9 @@
 # Turns the uploaded peat depth points into records that follow the
 # Data Exchange Standard for Peat Surveys v1.0 (corrected profile) with the
 # CarbonViewer Norwegian profile (see standard/), and lets the user download
-# them as a zip. Nothing is stored on the server.
+# them as a zip. Nothing is stored on the server. The module reads the uploaded
+# zip itself (read_dataset_zip() in global.R), so it does not need the volume
+# calculation.
 #
 # Switch off with options(carbonviewer.contribute = FALSE) before the app starts.
 
@@ -21,6 +23,9 @@ contribute_review_columns <- c("point", "recordDate", "surfacePeatDepth", "probe
 
 # Columns the user can edit per row in the review table
 contribute_editable <- c("recordDate", "probeReachedBottom", "peatDepthRemarks", "locationRemarks")
+
+# Hidden sort key of the review table: 1 for rows moved to the top
+contribute_top_column <- "top"
 
 # Map colours; "selected" also colours the selected rows of the review table
 contribute_colors <- c(yes = "#555555", no = "#f0ad4e", selected = "#1f78b4")
@@ -54,13 +59,27 @@ fmt_num <- function(x, digits) {
   out
 }
 
-# Yes/No from free text ("ja", "true", "1", ...); NA when not recognised
-normalize_yes_no <- function(x) {
+# Boolean value as the TDWG Boolean Controlled Vocabulary writes it ("true" or
+# "false"), from free text ("Yes", "ja", "TRUE", "1", ...); NA when not recognised
+normalize_boolean <- function(x) {
   x <- tolower(trimws(as.character(x)))
   out <- rep(NA_character_, length(x))
-  out[x %in% c("yes", "y", "ja", "j", "true", "t", "1")] <- "Yes"
-  out[x %in% c("no", "n", "nei", "false", "f", "0")] <- "No"
+  out[x %in% c("true", "t", "yes", "y", "ja", "j", "1")] <- "true"
+  out[x %in% c("false", "f", "no", "n", "nei", "0")] <- "false"
   out
+}
+
+# peatDepthResolution written for a resolution of n cm (as in "Nearest 1cm")
+resolution_value <- function(n) paste0("Nearest ", fmt_num(n, 2), "cm")
+
+# Label of a peatDepthResolution value, e.g. "Nearest 2.5cm" -> "Nærmeste 2,5 cm"
+resolution_label <- function(value, std, lang = "no") {
+  if (is.null(value) || length(value) == 0 || is_blank(value[1])) return(NULL)
+  ch <- std_choices(std, "peatDepthResolution", lang)
+  if (value %in% ch) return(names(ch)[match(value, ch)])
+  n <- sub("^Nearest ([0-9.]+) ?cm$", "\\1", value)
+  if (identical(n, value)) return(value)
+  if (lang == "no") paste0("Nærmeste ", sub(".", ",", n, fixed = TRUE), " cm") else paste0("Nearest ", n, " cm")
 }
 
 # Upload columns that are not standard attributes (kept as extra columns)
@@ -86,10 +105,10 @@ upload_has <- function(points, name, complete = TRUE) {
 #' in the uploaded CSV (matched by name, case-insensitive) win over the
 #' answers. Other upload columns are kept after the standard columns.
 #'
-#' @param points sf points with `torvdybde_cm` (as in `df_reactive$points`).
+#' @param points sf points with `torvdybde_cm` (as from `read_dataset_zip()`).
 #' @param answers named list: recordDate, surveyor, organizationName, location,
 #'   probeType, peatDepthResolution, coordinateUncertainty, peatDepthRemarks and
-#'   bottom ("all", "some" or "unsure").
+#'   bottom: was the bottom reached at "all", "some" or "none" of the points.
 #' @param std standard from `load_standard()`.
 #' @return data frame of character columns in the standard's order.
 standardize_points <- function(points, answers = list(), std) {
@@ -126,7 +145,7 @@ standardize_points <- function(points, answers = list(), std) {
   out$coordinateUncertainty <- fmt_num(suppressWarnings(as.numeric(ans("coordinateUncertainty"))), 2)
   out$peatDepthRemarks <- ans("peatDepthRemarks")
   out$probeReachedBottom <- switch(ans("bottom") %||% "",
-                                   all = "Yes", some = "Yes", unsure = "No", NA_character_)
+                                   all = "true", some = "true", none = "false", NA_character_)
 
   # Values from the upload win, row by row
   derived <- c("latitude", "longitude", "easting", "northing", "geodeticDatum",
@@ -137,10 +156,13 @@ standardize_points <- function(points, answers = list(), std) {
     if (is.na(hit)) next
     vals <- up[[hit]]
     vals <- if (inherits(vals, "Date")) format(vals, "%Y-%m-%d") else as.character(vals)
-    if (name == "probeReachedBottom") {
-      # Unrecognised or empty values become "No", as the standard advises when unsure
-      vals <- normalize_yes_no(vals)
-      vals[is.na(vals)] <- "No"
+    if (identical(std_field(std, name)$type, "boolean")) {
+      b <- normalize_boolean(vals)
+      # An empty or unrecognised probeReachedBottom means unsure, which the
+      # standard counts as false. Other unrecognised values are kept, so that
+      # the check reports them.
+      if (name == "probeReachedBottom") b[is.na(b)] <- "false"
+      vals <- ifelse(is.na(b), vals, b)
     }
     keep <- !is_blank(vals)
     out[[name]][keep] <- vals[keep]
@@ -216,7 +238,7 @@ build_metadata <- function(meta, records, std) {
 draft_methods <- function(answers, records, std, lang = "no") {
   n <- nrow(records)
   dates <- record_date_range(records$recordDate)
-  n_no <- sum(records$probeReachedBottom == "No", na.rm = TRUE)
+  n_no <- sum(records$probeReachedBottom %in% "false")
   probe <- answers$probeType
   probe_lab <- if (!is.null(probe) && !is_blank(probe)) {
     lab <- names(std_choices(std, "probeType", lang))[match(probe, std_choices(std, "probeType", lang))]
@@ -225,10 +247,7 @@ draft_methods <- function(answers, records, std, lang = "no") {
   pos <- Filter(function(p) identical(p$id, answers$positioning), std$no_profile$positioning)
   pos_lab <- if (length(pos)) pos[[1]]$methods[[lang]]
   unc <- answers$coordinateUncertainty
-  res <- answers$peatDepthResolution
-  res_lab <- if (!is.null(res) && !is_blank(res)) {
-    names(std_choices(std, "peatDepthResolution", lang))[match(res, std_choices(std, "peatDepthResolution", lang))]
-  }
+  res_lab <- resolution_label(answers$peatDepthResolution, std, lang)
   v <- std_versions(std)
 
   if (lang == "no") {
@@ -239,9 +258,9 @@ draft_methods <- function(answers, records, std, lang = "no") {
     }
     if (!is.null(probe_lab)) s <- paste0(s, " med ", probe_lab)
     s <- paste0(s, ".")
-    if (!is.null(res_lab) && !is.na(res_lab)) s <- paste0(s, " Dybden ble lest av til ", tolower(res_lab), ".")
+    if (!is.null(res_lab)) s <- paste0(s, " Dybden ble lest av til ", tolower(res_lab), ".")
     s <- paste0(s, if (n_no == 0) " Bunnen av torva ble nådd i alle punkter."
-                else if (n_no == n) " Det er usikkert om bunnen av torva ble nådd; dybdene er minsteverdier."
+                else if (n_no == n) " Det er ikke bekreftet at bunnen av torva ble nådd i noen punkter, så dybdene er minsteverdier."
                 else paste0(" Bunnen av torva ble ikke nådd (eller er usikker) i ", n_no, if (n_no == 1) " punkt." else " punkter."))
     if (!is.null(pos_lab)) {
       s <- paste0(s, " Posisjonene ble målt med ", pos_lab,
@@ -258,9 +277,9 @@ draft_methods <- function(answers, records, std, lang = "no") {
     }
     if (!is.null(probe_lab)) s <- paste0(s, " using a ", probe_lab)
     s <- paste0(s, ".")
-    if (!is.null(res_lab) && !is.na(res_lab)) s <- paste0(s, " Depths were read to the ", tolower(res_lab), ".")
+    if (!is.null(res_lab)) s <- paste0(s, " Depths were read to the ", tolower(res_lab), ".")
     s <- paste0(s, if (n_no == 0) " The bottom of the peat was reached at all points."
-                else if (n_no == n) " It is uncertain whether the bottom of the peat was reached; depths are minimum values."
+                else if (n_no == n) " The bottom of the peat was not confirmed at any point, so the depths are minimum values."
                 else paste0(" The bottom of the peat was not reached (or is uncertain) at ", n_no, if (n_no == 1) " point." else " points."))
     if (!is.null(pos_lab)) {
       s <- paste0(s, " Positions were recorded with a ", pos_lab,
@@ -301,6 +320,7 @@ write_standard_package <- function(records, metadata, std, dir) {
   data.table::fwrite(metadata, paths[2], eol = "\r\n", na = "", quote = "auto")
 
   v <- std_versions(std)
+  changes <- vapply(std$changes, `[[`, "", "id")
   extras <- setdiff(names(records), std_names(std, "peat_data"))
   readme <- c(
     paste("Peat depth records:", metadata$title %||% ""),
@@ -309,8 +329,8 @@ write_standard_package <- function(records, metadata, std, dir) {
     "",
     "Standard",
     paste0("  ", std$standard$citation),
-    paste0("  Corrected machine-readable profile ", v$profile,
-           " (corrections C1-C6, see standard/peat_standard_changes.csv in the CarbonViewer repository)."),
+    paste0("  Corrected machine-readable profile ", v$profile, " (changes ", changes[1], "-",
+           changes[length(changes)], ", see standard/peat_standard_changes.csv in the CarbonViewer repository)."),
     paste0("  ", std$no_profile$profile$name, " ", v$no_profile, "."),
     "  https://github.com/NINAnor/carbonviewer/tree/main/standard",
     "",
@@ -324,7 +344,9 @@ write_standard_package <- function(records, metadata, std, dir) {
     "  - surfacePeatDepth is in centimetres, measured from the surface.",
     "  - latitude/longitude are in EPSG:4326 (geodeticDatum). easting/northing are the",
     "    original coordinates in EPSG:25833 (ETRS89 / UTM zone 33N, see verbatimSRS).",
-    "  - probeReachedBottom = No means the depth is a minimum value.",
+    "  - probeReachedBottom = false means the depth is a minimum value. Yes/no values are",
+    "    written true/false, following the TDWG Boolean Controlled Vocabulary",
+    "    (http://rs.tdwg.org/boolean/values/).",
     "  - gridReference (Ordnance Survey grid) is not used in Norway and is left out.",
     if (length(extras)) paste0("  - Extra columns kept from the uploaded file: ", paste(extras, collapse = ", "), "."),
     "",
@@ -385,7 +407,27 @@ contribute_css <- function(ns) {
     "#%1$s table.dataTable tbody tr.selected > * {",
     "  box-shadow: inset 0 0 0 9999px %2$s !important; background-color: %2$s !important;",
     "  color: #fff !important; }",
+    ".contribute-toolbar-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 8px; }",
+    ".contribute-toolbar-label { min-width: 12em; }",
+    ".contribute-toolbar-row .btn { margin: 0; }",
+    ".contribute-undo { margin-left: auto; }",
+    ".contribute-details > summary { display: list-item; cursor: pointer; color: #3c8dbc; }",
+    ".contribute-details > summary:hover { text-decoration: underline; }",
     sep = "\n"), ns("table"), contribute_colors[["selected"]])
+}
+
+# Browser side of the module: reorders the review table on request, and tells
+# the server when the user has left a filled-in email field
+contribute_js <- function(ns) {
+  sprintf(paste(
+    "Shiny.addCustomMessageHandler('%1$s', function(m) {",
+    "  var table = $('#' + m.id).data('datatable');",
+    "  if (table) table.order(m.order).draw();",
+    "});",
+    "$(document).on('focusout', '#%2$s', function() {",
+    "  if (this.value) Shiny.setInputValue('%3$s', true);",
+    "});",
+    sep = "\n"), ns("order"), ns("contactElectronicMailAddress"), ns("email_touched"))
 }
 
 #############
@@ -395,7 +437,8 @@ contribute_css <- function(ns) {
 mod_contribute_ui <- function(id) {
   ns <- NS(id)
   tagList(
-    tags$head(tags$style(HTML(contribute_css(ns)))),
+    tags$head(tags$style(HTML(contribute_css(ns))),
+              tags$script(HTML(contribute_js(ns)))),
     fluidRow(
       box(width = 12,
           uiOutput(ns("progress")),
@@ -410,7 +453,7 @@ mod_contribute_ui <- function(id) {
                                   uiOutput(ns("review_tools")),
                                   DT::DTOutput(ns("table")),
                                   uiOutput(ns("review_columns"))),
-                           column(5, leafletOutput(ns("map"), height = 560))
+                           column(5, leafletOutput(ns("map"), height = 650))
                          )),
             tabPanelBody("metadata", uiOutput(ns("step_metadata"))),
             tabPanelBody("validate",
@@ -431,13 +474,13 @@ mod_contribute_ui <- function(id) {
 # MODULE SERVER #
 #################
 
-#' @param points,shape reactives returning the uploaded points and area (EPSG:25833).
-#' @param upload_state reactive: "uploaded", "test", ... (test data cannot be contributed).
+#' @param zip_path reactive returning the path of the uploaded zip (NULL before
+#'   an upload). The test data cannot be contributed, so they never come here.
 #' @param lang reactive: "no" or "en".
 #' @param tab_name tabName of the contribute tab in the sidebar menu.
 #' @param menu_id id of the sidebarMenu.
 #' @return list with `invite()`: shows the invitation popup (once per session).
-mod_contribute_server <- function(id, points, shape, upload_state, lang,
+mod_contribute_server <- function(id, zip_path, lang,
                                   tab_name = "contribute", menu_id = "tabs") {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
@@ -450,18 +493,31 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
     edits <- reactiveVal(NULL)
     # Selected rows, shared by the review table, the map and the buttons
     selected <- reactiveVal(integer(0))
+    # Rows moved to the top of the review table
+    on_top <- reactiveVal(integer(0))
     drafts <- reactiveValues(methods = NULL, bibliographicCitation = NULL)
 
+    # The uploaded zip is read as soon as it arrives, without waiting for the
+    # volume calculation: list(shape, points), list(error = code) or NULL
+    dataset <- reactive({
+      path <- zip_path()
+      if (is.null(path)) return(NULL)
+      dir <- tempfile("contribute_")
+      on.exit(unlink(dir, recursive = TRUE), add = TRUE)
+      tryCatch(read_dataset_zip(path, dir), error = function(e) list(error = "bad_zip"))
+    })
+    points <- reactive(dataset()$points)
+    shape <- reactive(dataset()$shape)
+
     has_points <- reactive(!is.null(points()) && nrow(points()) > 0)
-    is_test <- reactive(identical(upload_state(), "test"))
-    ready <- reactive(has_points() && !is_test())
     # The "reached the bottom?" question is skipped when the upload has its own column
     asks_bottom <- reactive(has_points() && !upload_has(points(), "probeReachedBottom", complete = FALSE))
 
-    # New data: start over
-    observeEvent(points(), {
-      edits(empty_edits(nrow(points())))
+    # New upload: start over (the intro says if the zip cannot be used)
+    observeEvent(dataset(), {
+      edits(empty_edits(if (has_points()) nrow(points()) else 0))
       selected(integer(0))
+      on_top(integer(0))
       step("intro")
     })
 
@@ -470,6 +526,11 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
     #################
     # INVITATION    #
     #################
+    # Someone who has opened the tab already needs no invitation
+    observe({
+      if (identical(session$rootScope()$input[[menu_id]], tab_name)) invited(TRUE)
+    })
+
     invite <- function() {
       if (isolate(invited()) || !contribute_enabled()) return(invisible())
       invited(TRUE)
@@ -509,13 +570,21 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
       if (is.na(d[2]) || d[1] == d[2]) d[1] else paste0(d[1], "/", d[2])
     })
 
+    # One of the profile's choices, or "Nearest <n>cm" for another resolution
+    depth_resolution <- reactive({
+      res <- input$peatDepthResolution
+      if (!identical(res, "custom")) return(res)
+      n <- suppressWarnings(as.numeric(input$resolution_custom))
+      if (length(n) == 0 || is.na(n) || n <= 0) NA_character_ else resolution_value(n)
+    })
+
     answers <- reactive(list(
       recordDate = record_date(),
       surveyor = input$surveyor,
       organizationName = input$organizationName,
       location = input$location,
       probeType = input$probeType,
-      peatDepthResolution = input$peatDepthResolution,
+      peatDepthResolution = depth_resolution(),
       positioning = input$positioning,
       coordinateUncertainty = uncertainty(),
       peatDepthRemarks = input$peatDepthRemarks,
@@ -616,11 +685,16 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
     iv_measure$add_rule("positioning", function(value) {
       if (is.null(value) || value == "") required_msg()
     })
-    iv_measure$add_rule("uncertainty_custom", function(value) {
-      if (identical(input$positioning, "custom") &&
-          (is.null(value) || is.na(value) || value <= 0)) {
+    above_zero <- function(value) {
+      if (is.null(value) || is.na(value) || value <= 0) {
         if (lang() == "no") "Oppgi et tall større enn 0" else "Enter a number above 0"
       }
+    }
+    iv_measure$add_rule("uncertainty_custom", function(value) {
+      if (identical(input$positioning, "custom")) above_zero(value)
+    })
+    iv_measure$add_rule("resolution_custom", function(value) {
+      if (identical(input$peatDepthResolution, "custom")) above_zero(value)
     })
 
     iv_meta <- shinyvalidate::InputValidator$new()
@@ -630,28 +704,34 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
         iv_meta$add_rule(nm, function(value) if (is_blank(value %||% "")) required_msg())
       })
     }
-    iv_meta$add_rule("contactElectronicMailAddress", function(value) {
+    iv_meta$add_rule("rights", function(value) {
+      if (identical(input$license, "Other") && is_blank(value %||% "")) required_msg()
+    })
+
+    # The email address has its own validator, so it can be checked as soon as
+    # the user leaves the field (see contribute_js()), not only on "Neste"
+    iv_email <- shinyvalidate::InputValidator$new()
+    iv_email$add_rule("contactElectronicMailAddress", function(value) {
       if (is_blank(value %||% "")) return(required_msg())
       if (!grepl("^[^@[:space:]]+@[^@[:space:]]+\\.[^@[:space:]]+$", trimws(value))) {
         if (lang() == "no") "Ugyldig e-postadresse" else "Not a valid email address"
       }
     })
-    iv_meta$add_rule("rights", function(value) {
-      if (identical(input$license, "Other") && is_blank(value %||% "")) required_msg()
-    })
+    observeEvent(input$email_touched, iv_email$enable(), once = TRUE)
 
-    validators <- list(intro = iv_intro, measure = iv_measure, metadata = iv_meta)
+    validators <- list(intro = list(iv_intro), measure = list(iv_measure),
+                       metadata = list(iv_meta, iv_email))
 
     # Problems that keep the user from leaving a step (NULL when there are none)
     step_problem <- function(s) {
-      iv <- validators[[s]]
-      if (!is.null(iv)) {
-        iv$enable()
-        if (!iv$is_valid()) return(tr("Noen felt må fylles ut eller rettes."))
+      ivs <- validators[[s]]
+      for (iv in ivs) iv$enable()
+      if (!all(vapply(ivs, function(iv) iv$is_valid(), TRUE))) {
+        return(tr("Noen felt må fylles ut eller rettes."))
       }
       if (s == "review" && asks_bottom() && identical(input$bottom, "some")) {
         r <- records()
-        if (!any(r$probeReachedBottom %in% "No")) {
+        if (!any(r$probeReachedBottom %in% "false")) {
           return(tr("Du svarte at dere ikke nådde bunnen i noen punkter, men ingen punkter er merket. Velg punktene og trykk «Nådde ikke bunnen», eller endre svaret i steg 2."))
         }
       }
@@ -666,7 +746,7 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
 
     # Going forward runs the checks of every step passed, as "Neste" does
     go_to <- function(target) {
-      if (!ready() || !target %in% contribute_steps) return(invisible())
+      if (!has_points() || !target %in% contribute_steps) return(invisible())
       from <- match(step(), contribute_steps)
       to <- match(target, contribute_steps)
       if (to > from) {
@@ -696,7 +776,7 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
         lab <- paste0(i, ". ", labels[[s]])
         item <- if (i == cur) {
           tags$b(lab)
-        } else if (ready()) {
+        } else if (has_points()) {
           tags$a(href = "#", lab,
                  onclick = sprintf("Shiny.setInputValue('%s', '%s', {priority: 'event'}); return false;",
                                    ns("goto"), s))
@@ -710,11 +790,11 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
     output$nav <- renderUI({
       i <- match(step(), contribute_steps)
       blocked <- FALSE
-      if (step() == "validate" && ready()) {
+      if (step() == "validate" && has_points()) {
         iss <- issues()
         blocked <- any(iss$level == "error")
       }
-      can_next <- i < length(contribute_steps) && ready() && !blocked
+      can_next <- i < length(contribute_steps) && has_points() && !blocked
       tagList(
         if (i > 1) actionButton(ns("back"), tr("Tilbake"), icon = icon("arrow-left")),
         if (can_next)
@@ -737,16 +817,31 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
     #################
     # 1. INTRO      #
     #################
+    # Why an uploaded zip cannot be used (codes from read_dataset_zip())
+    upload_problem <- function(code) {
+      switch(code,
+             no_shp = tr("Zip-filen mangler en .shp-fil med området."),
+             no_prj = tr("Zip-filen mangler en .prj-fil med koordinatsystemet."),
+             no_csv = tr("Zip-filen mangler en .csv-fil med torvdybdene."),
+             corrupt_shp = tr("Shapefilen i zip-filen kan ikke leses."),
+             bad_csv = tr("CSV-filen i zip-filen må ha kolonnene x, y og torvdybde_cm."),
+             tr("Zip-filen kan ikke leses."))
+    }
+
     output$step_intro <- renderUI({
       l <- lang()
+      error <- dataset()$error
       tagList(
         h3(tr("Bidra med torvdybdene dine")),
-        if (!has_points()) {
+        if (!is.null(error)) {
+          div(class = "alert alert-danger", upload_problem(error), " ",
+              tr("Se bruksanvisningen for hvordan zip-filen skal se ut, og last den opp på nytt."))
+        } else if (!has_points()) {
           div(class = "alert alert-info",
-              tr("Last opp en zip-fil og trykk «Beregn» først. Deretter kan du gjøre målingene om til en standard datafil her."))
-        } else if (is_test()) {
-          div(class = "alert alert-warning",
-              tr("Testdataene kan ikke brukes til å bidra. Last opp dine egne målinger for å bruke denne funksjonen."))
+              tr("Last opp en zip-fil med målingene dine under «Last opp data». Du trenger ikke å beregne volumet først."))
+        } else {
+          div(class = "alert alert-success",
+              sprintf(tr("Zip-filen din er lest inn: %s punkter med torvdybde."), nrow(points())))
         },
         p(tr("Torvdybder er verdifulle utover ditt eget prosjekt. Samlet kan de bli treningsdata for bedre kart over torv i Norge.")),
         p(tr("Her gjør vi målingene dine om til en datafil som følger «Data Exchange Standard for Peat Surveys» (Natural England, v1.0) med en norsk profil. Du svarer på noen få spørsmål om målingene og datasettet, og laster ned en zip-fil.")),
@@ -790,26 +885,36 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
                  if (has_date) helpText(tr("Filen din har allerede dato for alle punkter. Den brukes.")),
                  std_input(std, "surveyor", ns, l, val("surveyor"), required = !has_surveyor),
                  std_input(std, "probeType", ns, l, val("probeType")),
-                 std_input(std, "peatDepthResolution", ns, l,
-                           val("peatDepthResolution", std_default(std, "peatDepthResolution")),
-                           required = TRUE)
+                 # The profile's resolutions, or "Other" with a number of cm
+                 radioButtons(ns("peatDepthResolution"), paste(std_label(std, "peatDepthResolution", l), "*"),
+                              choices = c(std_choices(std, "peatDepthResolution", l),
+                                          stats::setNames("custom", tr("Annen"))),
+                              selected = val("peatDepthResolution", std_default(std, "peatDepthResolution")),
+                              inline = TRUE, width = "100%"),
+                 conditionalPanel(sprintf("input['%s'] == 'custom'", ns("peatDepthResolution")),
+                                  numericInput(ns("resolution_custom"), tr("Oppløsning (cm)"),
+                                               value = val("resolution_custom", NA), min = 0, step = 1)),
+                 std_help_text(std, "peatDepthResolution", l)
           ),
           column(6,
                  if (!is.null(pts) && !asks_bottom()) {
                    tagList(tags$label(std_label(std, "probeReachedBottom", l)),
-                           helpText(tr("Filen din har allerede en kolonne probeReachedBottom. Verdiene brukes; tomme eller ukjente verdier blir «No».")))
+                           helpText(tr("Filen din har allerede en kolonne probeReachedBottom, og verdiene brukes. Tomme eller ukjente verdier regnes som «nådde ikke bunnen».")))
                  } else {
                    tagList(
                      radioButtons(ns("bottom"), paste(std_label(std, "probeReachedBottom", l), "*"),
                                   choiceNames = list(tr("Ja, i alle punktene"),
-                                                     tr("Nei, eller usikker, i noen punkter"),
-                                                     tr("Usikker for alle punktene")),
-                                  choiceValues = list("all", "some", "unsure"),
+                                                     tr("Nei eller usikker i noen av punktene"),
+                                                     tr("Nei eller usikker i alle punktene")),
+                                  choiceValues = list("all", "some", "none"),
                                   selected = val("bottom", character(0)), width = "100%"),
                      std_help_text(std, "probeReachedBottom", l),
                      conditionalPanel(sprintf("input['%s'] == 'some'", ns("bottom")),
                                       div(class = "alert alert-info",
-                                          tr("Alle punktene får «Yes» foreløpig. I neste steg merker du punktene der dere ikke nådde bunnen.")))
+                                          tr("I neste steg merker du punktene der dere ikke nådde bunnen. Alle andre punkter regnes som målt helt til bunnen."))),
+                     conditionalPanel(sprintf("input['%s'] == 'none'", ns("bottom")),
+                                      div(class = "alert alert-info",
+                                          tr("Alle dybdene regnes da som minsteverdier.")))
                    )
                  },
                  radioButtons(ns("positioning"), paste(std_label(std, "coordinateUncertainty", l), "*"),
@@ -832,7 +937,7 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
       req(has_points())
       must_mark <- asks_bottom() && identical(input$bottom, "some")
       r <- records()
-      n_no <- sum(r$probeReachedBottom %in% "No")
+      n_no <- sum(r$probeReachedBottom %in% "false")
       extras <- contribute_extra_columns(points(), std)
       tagList(
         h3(tr("Se over punktene")),
@@ -852,7 +957,7 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
         tags$b(tr("Valgfritt:")),
         tags$ul(
           tags$li(tr("Rett dato eller skriv merknader for enkeltpunkter: dobbeltklikk på en celle i kolonnene recordDate, peatDepthRemarks eller locationRemarks.")),
-          tags$li(tr("Endre om bunnen ble nådd: velg punkter ved å klikke på rader i tabellen eller på punkter i kartet, og bruk knappene over tabellen.")),
+          tags$li(tr("Velg punkter ved å klikke på rader i tabellen eller på punkter i kartet. Med knappene over tabellen merker du om bunnen ble nådd, eller flytter de valgte punktene øverst i tabellen.")),
           tags$li(tr("Hold musepekeren over en kolonneoverskrift for å se hva kolonnen betyr, eller åpne «Hva betyr kolonnene?» under tabellen."))
         ),
         if (length(extras)) {
@@ -861,19 +966,21 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
       )
     })
 
+    # Two rows: the selection (count first), then what to do with it
     output$review_tools <- renderUI({
       req(has_points())
       tagList(
-        div(style = "margin-bottom: 6px;",
+        div(class = "contribute-toolbar-row",
+            tags$b(class = "contribute-toolbar-label", textOutput(ns("selection_count"), inline = TRUE)),
             actionButton(ns("select_all"), tr("Velg alle"), icon = icon("check-double"), class = "btn-sm"),
             actionButton(ns("select_none"), tr("Fjern valg"), icon = icon("xmark"), class = "btn-sm"),
-            tags$span(style = "margin-left: 8px;", textOutput(ns("selection_count"), inline = TRUE))),
-        div(style = "margin-bottom: 10px;",
-            tags$span(tr("Valgte punkter:")), " ",
-            actionButton(ns("mark_no"), tr("Nådde ikke bunnen"), icon = icon("arrow-down"), class = "btn-sm"),
+            actionButton(ns("move_to_top"), tr("Flytt valgte øverst"), icon = icon("arrow-up"), class = "btn-sm")),
+        div(class = "contribute-toolbar-row",
+            tags$span(class = "contribute-toolbar-label", tr("Merk valgte punkter:")),
             actionButton(ns("mark_yes"), tr("Nådde bunnen"), icon = icon("check"), class = "btn-sm"),
-            actionLink(ns("clear_edits"), tr("Angre alle endringer i tabellen"), icon = icon("rotate-left"),
-                       style = "margin-left: 12px;"))
+            actionButton(ns("mark_no"), tr("Nådde ikke bunnen"), icon = icon("arrow-down"), class = "btn-sm"),
+            actionLink(ns("clear_edits"), tr("Angre alle endringer"), icon = icon("rotate-left"),
+                       class = "contribute-undo"))
       )
     })
 
@@ -892,18 +999,25 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
     output$review_columns <- renderUI({
       req(has_points())
       tips <- column_tips(contribute_review_columns)
-      tags$details(style = "margin-top: 10px;",
+      tags$details(class = "contribute-details", style = "margin-top: 10px;",
                    tags$summary(tr("Hva betyr kolonnene?")),
                    tags$dl(lapply(seq_along(tips), function(i) {
                      tagList(tags$dt(tags$code(contribute_review_columns[i])), tags$dd(tips[i]))
                    })))
     })
 
+    # The last column is the hidden sort key for "Move selected to top"
     review_data <- reactive({
       r <- records()
-      cbind(point = seq_len(nrow(r)),
-            as_display(r[, setdiff(contribute_review_columns, "point"), drop = FALSE], std))
+      top <- on_top()
+      d <- cbind(point = seq_len(nrow(r)),
+                 as_display(r[, setdiff(contribute_review_columns, "point"), drop = FALSE], std))
+      d[[contribute_top_column]] <- as.integer(seq_len(nrow(r)) %in% top)
+      d
     })
+
+    # Table column (0-based, as DataTables counts) of a review_data() column
+    dt_column <- function(name) match(name, c(contribute_review_columns, contribute_top_column)) - 1
 
     output$table <- DT::renderDT({
       req(has_points())
@@ -918,18 +1032,46 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
         selection = list(mode = "multiple", selected = if (length(sel)) sel),
         editable = list(target = "cell",
                         disable = list(columns = which(!names(d) %in% contribute_editable) - 1)),
+        # A fixed body height keeps the headings in view when scrolling through many rows
         options = list(pageLength = 15, lengthMenu = c(15, 50, 100, 500), scrollX = TRUE,
-                       autoWidth = FALSE,
-                       order = list(list(match("surfacePeatDepth", names(d)) - 1, "desc")),
+                       scrollY = "450px", scrollCollapse = TRUE, autoWidth = FALSE,
+                       order = list(list(dt_column("surfacePeatDepth"), "desc")),
+                       columnDefs = list(list(visible = FALSE, targets = dt_column(contribute_top_column))),
                        language = dt_language(l)))
     })
 
     table_proxy <- DT::dataTableProxy("table")
+    # TRUE after a cell edit that the table shows as it is stored. Then only the
+    # server's copy of the data is updated: reloading would redraw the table and
+    # drop an edit the user has just started in another cell.
+    edit_shown <- FALSE
     observe({
       req(has_points())
       d <- review_data()
-      DT::replaceData(table_proxy, d, rownames = FALSE, resetPaging = FALSE,
-                      clearSelection = "none")
+      if (edit_shown) {
+        edit_shown <<- FALSE
+        DT::dataTableAjax(session, d, rownames = FALSE, outputId = "table")
+      } else {
+        DT::replaceData(table_proxy, d, rownames = FALSE, resetPaging = FALSE,
+                        clearSelection = "none")
+      }
+    })
+
+    # The rows selected now go to the top (deepest first) and stay there, also
+    # when the selection changes, until the button is used again or the user
+    # sorts by another column
+    observeEvent(input$move_to_top, {
+      rows <- selected()
+      if (length(rows) == 0) {
+        showNotification(tr("Velg ett eller flere punkter først."), type = "message")
+        return()
+      }
+      on_top(rows)
+      DT::clearSearch(table_proxy)
+      session$sendCustomMessage(ns("order"), list(
+        id = ns("table"),
+        order = list(list(dt_column(contribute_top_column), "desc"),
+                     list(dt_column("surfacePeatDepth"), "desc"))))
     })
 
     observeEvent(input$table_cell_edit, {
@@ -938,9 +1080,9 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
       req(name %in% contribute_editable)
       v <- trimws(as.character(info$value))
       if (name == "probeReachedBottom") {
-        v <- normalize_yes_no(v)
+        v <- normalize_boolean(v)
         if (is.na(v)) {
-          showNotification(tr("Skriv Yes eller No (Ja/Nei)."), type = "warning")
+          showNotification(tr("Skriv true eller false (eller ja/nei)."), type = "warning")
           v <- NA_character_
         }
       } else if (v == "") {
@@ -949,6 +1091,8 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
       e <- edits()
       # An emptied cell falls back to the dataset-wide answer
       e[info$row, name] <- v
+      # The table shows the edit already, unless the value was changed here
+      edit_shown <<- !identical(e, edits()) && !is.na(v) && identical(v, as.character(info$value))
       edits(e)
     })
 
@@ -982,13 +1126,13 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
       # Clear the selection so that the new colours show on the map
       set_selected(integer(0))
     }
-    observeEvent(input$mark_no, mark_bottom("No"))
-    observeEvent(input$mark_yes, mark_bottom("Yes"))
+    observeEvent(input$mark_no, mark_bottom("false"))
+    observeEvent(input$mark_yes, mark_bottom("true"))
     observeEvent(input$clear_edits, edits(empty_edits(nrow(points()))))
 
     point_labels <- function(r) {
       paste0("#", seq_len(nrow(r)), ": ", r$surfacePeatDepth, " cm",
-             ifelse(r$probeReachedBottom %in% "No", paste0(" (", tr("nådde ikke bunnen"), ")"), ""))
+             ifelse(r$probeReachedBottom %in% "false", paste0(" (", tr("nådde ikke bunnen"), ")"), ""))
     }
 
     draw_points <- function(map, r) {
@@ -998,7 +1142,7 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
                          layerId = as.character(seq_len(nrow(r))), group = "points",
                          radius = 5, stroke = TRUE, weight = 1, color = "black", opacity = 1,
                          fillOpacity = 0.9, label = point_labels(r),
-                         fillColor = unname(ifelse(r$probeReachedBottom %in% "No",
+                         fillColor = unname(ifelse(r$probeReachedBottom %in% "false",
                                                    contribute_colors[["no"]], contribute_colors[["yes"]])))
     }
 

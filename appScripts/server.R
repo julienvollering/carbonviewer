@@ -69,12 +69,11 @@ server <- function(input, output, session){
     values$upload_state <- 'test'
   })
   
-  # Optional "Contribute data" module (appScripts/contribute.R)
+  # Optional "Contribute data" module (appScripts/contribute.R). It reads the
+  # uploaded zip itself, so it works before (or without) the volume calculation.
   if (contribute_enabled()) {
     contribute <- mod_contribute_server("contribute",
-                                        points = reactive(df_reactive$points),
-                                        shape = reactive(df_reactive$shape),
-                                        upload_state = reactive(values$upload_state),
+                                        zip_path = reactive(input$upload_zip$datapath),
                                         lang = reactive(input$selected_language %||% "no"))
   }
   
@@ -93,83 +92,26 @@ server <- function(input, output, session){
     
       print(paste("Upload state:", values$upload_state))
       if (values$upload_state == 'test'){
-        unzip ("/home/rstudio/app/test/test_dataset_cm.zip", exdir = file.path(BASE))
+        zip_path <- "/home/rstudio/app/test/test_dataset_cm.zip"
       }
-        # unzip the file
-      else if (values$upload_state == 'uploaded'){
-          if (is.null(input$upload_zip$datapath)) {}
-          else {
-            unzip (input$upload_zip$datapath, exdir = file.path(BASE))
-          }
+      else {
+        zip_path <- input$upload_zip$datapath
       }
-      
-      n_files <- list.files(BASE, recursive = TRUE)
-      print(n_files)
 
+      # Unzip and read the shapefile and the CSV (global.R)
+      dataset <- read_dataset_zip(zip_path, BASE)
 
-      shp_file <- list.files(BASE, pattern = '.shp$', recursive = TRUE)
-      prj_file <- list.files(BASE, pattern = '.prj$', recursive = TRUE)
-      csv_file <- list.files(BASE, pattern = '.csv$', recursive = TRUE)
-        
-      # Check if there is both a shapefile and a CSV
-      if (length(shp_file) == 0){
-        print_no_shp()
-      }
-      else if (length(prj_file) == 0){
-        print_no_prj()
-        }
-      else if (length(csv_file) == 0){
-        print_no_csv()
-      }
-      else{
-
-        tryCatch({
-          shp <- st_read(paste0(BASE, "/", shp_file))
-        }, error = function(e){
-          print_corrupt_shp()
+      if (!is.null(dataset$error)){
+        print_dataset_error(dataset$error)
+        if (dataset$error == "corrupt_shp"){
           # sleep for 15 sec and reload session
           Sys.sleep(15)
           session$reload()
-        })
-        #shp <- open_shapefile(paste0(BASE, "/", shp_file))
-
-
-
-        input_crs = st_crs(shp)
-        target_crs = 25833
-        # Check if the shapefile has a CRS / IF NOT WE ASSUME THAT THE CRS
-        # IS 25833 AS SPECIFIED ON THE README
-        if (is.na(st_crs(shp))) {
-          print("The shapefile does not contain a projection (CRS)--> assigning the default CRS 'EPSG:25833'")
-          shp <- shp %>% st_set_crs(target_crs)
-          } 
-        else {
-          print("The shapefile has a projection (CRS) --> Converting to 'EPSG:25833'")
-          shp <- shp %>% st_transform(target_crs)
         }
-        
-        df <- open_csv(paste0(BASE, "/", csv_file)) 
-        names(df) <- tolower(names(df))
-
-        # If name is peat_depth_cm change to torvdybde_cm
-        if ("peat_depth_cm" %in% names(df)){
-          names(df)[names(df) == "peat_depth_cm"] <- "torvdybde_cm"
-        }
-        
-        # Check that the CSV contains the necessary columns (x,y, torvdybde_cm)
-        necessary_columns <- c("x","y", "torvdybde_cm")
-        print(sum(names(df) %in% necessary_columns) != 3)
-
-        # print first row of the dataframe
-        print(head(df))
-        
-        if (sum(names(df) %in% necessary_columns) != 3){
-          print_error_csv_columns()
-        }
-        else{
-          dfs <- transform_to_sf(df) %>% st_set_crs(st_crs(input_crs))
-          dfs <- dfs %>% st_transform(target_crs)
-          shp <- shp %>% st_transform(target_crs)
+      }
+      else{
+          shp <- dataset$shape
+          dfs <- dataset$points
 
           #print(head(dfs))
           print(head(shp))
@@ -199,7 +141,6 @@ server <- function(input, output, session){
           observe({
             print(reactiveValuesToList(df_reactive))
           })
-        }
       }
     }
       

@@ -85,13 +85,13 @@ Zip-filen inneholder følgende filer:
 
 ### 5. Bidra med torvdybdene dine (valgfritt)
 
-Torvdybdemålingene dine er verdifulle utover ditt eget prosjekt: samlet kan de bli treningsdata for nasjonal kartlegging av torv. Etter en vellykket beregning med egne data spør CarbonViewer om du vil bidra. Du kan også åpne **Bidra med data** i sidemenyen når som helst.
+Torvdybdemålingene dine er verdifulle utover ditt eget prosjekt: samlet kan de bli treningsdata for nasjonal kartlegging av torv. Du trenger ikke å beregne volumet først: last opp zip-filen og åpne **Bidra med data** i sidemenyen. Etter en beregning med egne data spør CarbonViewer også om du vil bidra.
 
 En kort veiviser gjør punktene dine om til filer som følger [Data Exchange Standard for Peat Surveys v1.0](https://github.com/NINAnor/carbonviewer/tree/main/standard) (Natural England) med en norsk profil:
 
 1. **Om bidraget:** hva som skjer med dataene, og en merknad om personopplysninger.
-2. **Om målingene:** måledato(er), hvem som målte, måleutstyr, om bunnen av torva ble nådd, måleoppløsning og hvordan posisjonene ble målt.
-3. **Se over punktene:** en tabell ved siden av et kart, med svarene dine fylt inn. Hvis sonden ikke nådde bunnen i noen punkter, merker du disse punktene her: velg dem ved å klikke på rader i tabellen eller på punkter i kartet. Du kan også rette dato og merknader per punkt. Hold musepekeren over en kolonneoverskrift for å se hva den betyr.
+2. **Om målingene:** måledato(er), hvem som målte, måleutstyr, om bunnen av torva ble nådd, måleoppløsning (1, 5 eller 10 cm, eller en annen verdi) og hvordan posisjonene ble målt.
+3. **Se over punktene:** en tabell ved siden av et kart, med svarene dine fylt inn. Hvis sonden ikke nådde bunnen i noen punkter, merker du disse punktene her: velg dem ved å klikke på rader i tabellen eller på punkter i kartet. **Flytt valgte øverst** flytter de valgte punktene øverst i tabellen, så du kan rette dem der. Du kan også rette dato og merknader per punkt. Hold musepekeren over en kolonneoverskrift for å se hva den betyr.
 4. **Om datasettet:** tittel, organisasjon, kort beskrivelse, e-post til kontaktperson og lisens (CC BY, CC0, CC BY-NC, NLOD 2.0 eller annet).
 5. **Kontroll:** dataene sjekkes mot standarden, og det foreslås et utkast til metodetekst og sitering.
 6. **Last ned:** en zip-fil med de standardiserte dataene.
@@ -103,7 +103,7 @@ En kort veiviser gjør punktene dine om til filer som følger [Data Exchange Sta
 └── README.txt         # hvilken standard og profil filene følger
 ```
 
-Ingenting lagres på serveren; du bestemmer selv hva du gjør med filen. Kolonner i CSV-filen din som heter det samme som attributter i standarden (f.eks. `probeReachedBottom`, `recordDate`, `locationRemarks`), brukes som de er, og andre kolonner tas med som ekstra kolonner. Testdataene kan ikke brukes til å bidra.
+Ingenting lagres på serveren; du bestemmer selv hva du gjør med filen. Kolonner i CSV-filen din som heter det samme som attributter i standarden (f.eks. `probeReachedBottom`, `recordDate`, `locationRemarks`), brukes som de er, og andre kolonner tas med som ekstra kolonner. Ja/nei-verdier som `probeReachedBottom` skrives som `true`/`false` ([TDWG Boolean Controlled Vocabulary](https://tag.tdwg.org/boolean/)). Testdataene kan ikke brukes til å bidra.
 
 ***Brukerveiledning:** Trykk på Bidra med data. Følg stegene og trykk på Last ned standardiserte data. Du kan også klikke på stegnavnene øverst for å gå mellom stegene.*
 

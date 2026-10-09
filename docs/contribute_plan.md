@@ -28,16 +28,16 @@ The user transcribed the standard into machine-readable files. **These, not the 
 
 | File | Content |
 |---|---|
-| `peat_standard_v1.0.yaml` | The full standard as a corrected profile (`1.0-corr.1`): 24 peat-data attributes and 21 metadata terms, each with requirement level, inferred type/unit, allowed values, Darwin Core mapping, description and example. It also has machine-readable cross-field `rules` (location groups, conditional requirements, defaults), footnotes and references. |
+| `peat_standard_v1.0.yaml` | The full standard as a corrected profile (`1.0-corr.2`; `1.0-corr.1` before the second test run): 24 peat-data attributes and 21 metadata terms, each with requirement level, inferred type/unit, allowed values, Darwin Core mapping, description and example. It also has machine-readable cross-field `rules` (location groups, conditional requirements, defaults), footnotes and references. |
 | `peat_data_attributes.csv` | A flat table of the attributes, with `order` (the recommended column order). |
 | `peat_metadata_terms.csv` | A flat table of the metadata terms. |
-| `peat_standard_changes.csv` | Corrections C1–C6 against the published v1.0, e.g. C1 (EPSG:27700), C3 (easting/northing with an explicit `verbatimSRS`) and C5 (`verticalDatum` required with elevation). |
+| `peat_standard_changes.csv` | Changes C1–C7 against the published v1.0, e.g. C1 (EPSG:27700), C3 (easting/northing with an explicit `verbatimSRS`), C5 (`verticalDatum` required with elevation) and C7 (`true`/`false` instead of `Yes`/`No`). |
 
 The app reads the **YAML** at runtime using the `yaml` package, which ships with rocker/geospatial. The CSVs are human-readable views of it. The Norwegian profile is a small overlay file (`standard/peat_standard_no_profile.yaml`). It holds NO/EN labels and help text, defaults (`country = "Norway"`, `geodeticDatum = "EPSG:4326"`, `verbatimSRS = "EPSG:25833"`), the licence choices shown to users, and the attributes CarbonViewer hides (`gridReference`).
 
 ### What the reference files changed in this plan
 - **No depth conversion.** Depth is already in cm.
-- **`probeReachedBottom` is *required*** (Yes/No, and "No" if unsure). The wizard asks one direct question: *"Did you reach the bottom of the peat at every point?"* There are three answers:
+- **`probeReachedBottom` is *required*** (Yes/No, and "No" if unsure; written `true`/`false` since change C7, see the second test run). The wizard asks one direct question: *"Did you reach the bottom of the peat at every point?"* There are three answers:
   - **Yes, at all points** → every point gets `Yes`.
   - **No / not sure at some points** → every point gets `Yes`, and the user sets the affected points to `No` with a toggle column in the editable table.
   - **Not sure for any point** → every point gets `No`, as the standard advises.
@@ -85,7 +85,7 @@ A "Submit" button writes the package and a manifest (UUID, timestamp, app and pr
 A curator merges reviewed submissions into a versioned national dataset with a DOI (Zenodo via `zen4R`, or DataverseNO), keeping each record's licence and attribution. The standard's Darwin Core mappings (`dwc_iri`, `dwc_note`) make a later DwC/GBIF export easy.
 
 ## Files to add or modify
-- **New** `appScripts/contribute.R`: `mod_contribute_ui()` / `mod_contribute_server(id, points, shape)`, plus the helpers `standardize_points()`, `build_metadata()`, `write_standard_package()`, and the `store_submission()` stub.
+- **New** `appScripts/contribute.R`: `mod_contribute_ui()` / `mod_contribute_server()`, plus the helpers `standardize_points()`, `build_metadata()`, `write_standard_package()`, and the `store_submission()` stub. Since the second test run the module takes the path of the uploaded zip (`mod_contribute_server(id, zip_path, lang)`) and reads it with `read_dataset_zip()` in `global.R`.
 - **New** `appScripts/standard.R`: `load_standard()` (YAML + NO overlay), `validate_against_standard()`, and helpers that build form inputs from the schema.
 - **New** `standard/peat_standard_no_profile.yaml`: the Norwegian overlay.
 - `app.R`: `source()` the new files.
@@ -124,3 +124,12 @@ Notes from stepping through the wizard in Docker, and how each is handled:
 7. **Shorter probe-type list:** torvsonde/jordsonde, skredsøkestang, kabelstang, torvbor (f.eks. russerbor), jordprøvetaker, annet. The other NE values stay valid in uploaded files.
 8. **NLOD 2.0 in the licence list.** It writes `license = Other` and `rights = NLOD 2.0`, as decided above, so the files stay valid under the NE standard.
 9. **Clickable step names** at the top. Jumping forward runs the same checks as "Neste" for every step it passes.
+
+## Feedback from the second test run (2026-10-09)
+1. **Contribute without the volume calculation.** "Beregn" can take a while, and some users may only want to contribute. The contribute tab now reads the uploaded zip itself, right after the upload. The reading code moved from `server.R` into `read_dataset_zip()` in `global.R`, which the volume calculation also uses, so both read the zip the same way. The invitation after a calculation is skipped if the user has already opened the tab.
+2. **Other depth resolutions.** Besides 1, 5 and 10 cm, "Other" takes a number of cm and writes `Nearest <n>cm` to `peatDepthResolution`.
+3. **Yes/No wording and Boolean values.** The answer texts no longer quote «Yes»/«No». The corrected profile (now `1.0-corr.2`) writes `peatPresence` and `probeReachedBottom` as `true`/`false`, following the [TDWG Boolean Controlled Vocabulary](https://tag.tdwg.org/boolean/) (change C7). Unlike C1–C6, this means files from the app no longer match the published v1.0 exactly: a strict v1.0 reader expects `Yes`/`No` in these two columns. The mapping is one-to-one (Yes → true, No → false), so converting back is trivial. The tables show the stored values (`true`/`false`); buttons, the legend and the questions use plain words. Uploaded yes/no columns (`ja`/`nei`, `Yes`/`No`, `TRUE`/`FALSE`, `1`/`0`) are converted.
+4. **Tidier review toolbar.** Two rows: the selection count, then "Select all", "Clear selection" and "Move selected to top"; then "Mark selected points:" with "Bottom reached" / "Bottom not reached". "Undo all edits" sits at the right.
+5. **"What do the columns mean?" looks clickable** (link colour, disclosure arrow).
+6. **Move selected to top.** The selected rows (e.g. picked on the map) go to the top of the table and stay there while they are edited, until the button is used again or another column is sorted. The table body now scrolls under fixed headings, so longer pages (50 or 100 rows) keep their headings in view. A related bug was fixed: an edit could be lost if the user started editing the next cell before the table had saved the first.
+7. **Email check.** The address was already required and checked on "Neste". It is now also checked as soon as the user leaves the filled-in field.

@@ -1,6 +1,6 @@
 # CarbonViewer Norwegian profile of the Data Exchange Standard for Peat Surveys
 #
-# A thin overlay on peat_standard_v1.0.yaml (profile 1.0-corr.1). It changes no
+# A thin overlay on peat_standard_v1.0.yaml (profile 1.0-corr.2). It changes no
 # attribute or term of the standard. It only adds:
 # - NO/EN labels and help text for the fields CarbonViewer asks about,
 # - NO/EN descriptions of the columns shown in the wizard's tables,
@@ -13,10 +13,10 @@
 
 profile:
   name: CarbonViewer Norwegian profile
-  profile_version: "0.1.0"
+  profile_version: "0.2.0"
   date: "2026-10-09"
   based_on: peat_standard_v1.0.yaml
-  based_on_profile_version: "1.0-corr.1"
+  based_on_profile_version: "1.0-corr.2"
   languages: ["no", en]
 
 # Values written to every record unless the uploaded CSV gives its own.
@@ -52,13 +52,13 @@ fields:
   probeReachedBottom:
     label: {"no": "Nådde dere bunnen av torva?", en: "Did you reach the bottom of the peat?"}
     help:
-      "no": "Hvis sonden ikke nådde bunnen, er dybden en minsteverdi. Standarden sier «Nei» hvis du er usikker."
-      en: "If the probe did not reach the bottom, the depth is a minimum. The standard says 'No' if you are unsure."
+      "no": "Hvis sonden ikke nådde bunnen, er dybden bare en minsteverdi. Er du usikker, skal punktet regnes som «nådde ikke bunnen», slik standarden anbefaler."
+      en: "If the probe did not reach the bottom, the depth is only a minimum. If you are unsure, count the point as 'did not reach the bottom', as the standard advises."
   peatDepthResolution:
     label: {"no": "Måleoppløsning", en: "Depth resolution"}
     help:
-      "no": "Hvor nøyaktig ble dybden lest av?"
-      en: "How precisely was the depth read?"
+      "no": "Hvor nøyaktig ble dybden lest av? Velg «Annen» for å oppgi en annen oppløsning i cm."
+      en: "How precisely was the depth read? Choose 'Other' to enter another resolution in cm."
   coordinateUncertainty:
     label: {"no": "Hvordan ble posisjonene målt?", en: "How were the positions measured?"}
     help:
@@ -158,6 +158,7 @@ choices:
       label: {"no": "Jordprøvetaker", en: "Soil corer"}
     - value: other
       label: {"no": "Annet (beskriv under merknader)", en: "Other (describe in the remarks)"}
+  # The wizard also offers "Other", which writes "Nearest <n>cm" for a resolution of n cm
   peatDepthResolution:
     - value: Nearest 1cm
       label: {"no": "Nærmeste 1 cm", en: "Nearest 1 cm"}
@@ -215,8 +216,8 @@ columns:
     "no": "Hvor nøyaktig dybden ble lest av."
     en: "How precisely the depth was read."
   peatPresence:
-    "no": "Om det var torv (Yes/No). Brukes bare når dybden mangler."
-    en: "Whether peat was present (Yes/No). Only used when there is no depth."
+    "no": "Om det var torv (true = ja, false = nei). Brukes bare når dybden mangler."
+    en: "Whether peat was present (true = yes, false = no). Only used when there is no depth."
   buriedPeatStartDepth:
     "no": "Dybde (cm) der et begravd torvlag starter."
     en: "Depth (cm) where a buried peat layer starts."
@@ -233,8 +234,8 @@ columns:
     "no": "Måleutstyret som ble brukt."
     en: "The probe or sampler that was used."
   probeReachedBottom:
-    "no": "Nådde sonden bunnen av torva? «Yes» eller «No». «No» betyr at dybden er en minsteverdi."
-    en: "Did the probe reach the bottom of the peat? 'Yes' or 'No'. 'No' means the depth is a minimum."
+    "no": "Nådde sonden bunnen av torva? true = ja, false = nei eller usikker. Ved false er dybden en minsteverdi."
+    en: "Did the probe reach the bottom of the peat? true = yes, false = no or unsure. With false, the depth is a minimum."
   peatDepthRemarks:
     "no": "Valgfritt. Merknad om målingen i dette punktet, f.eks. «Stein i bunnen»."
     en: "Optional. A remark on the measurement at this point, e.g. 'Stones at the base'."

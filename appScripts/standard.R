@@ -147,6 +147,8 @@ is_iso_date <- function(x) {
                 no = "«%s» må være en dato som ÅÅÅÅ-MM-DD (eller en periode ÅÅÅÅ-MM-DD/ÅÅÅÅ-MM-DD)."),
   enum = c(en = "'%s' must be one of: %s.",
            no = "«%s» må være en av: %s."),
+  type_boolean = c(en = "'%s' must be true or false.",
+                   no = "«%s» må være true eller false."),
   at_least_one_group_complete = c(en = "A location is needed: give %s.",
                                   no = "Posisjon mangler: oppgi %s."),
   required_if_present = c(en = "'%s' is required when %s is given.",
@@ -214,12 +216,15 @@ validate_against_standard <- function(data, std, part = c("peat_data", "metadata
       number = filled & is.na(suppressWarnings(as.numeric(x))),
       date = filled & !is_iso_date(x),
       enum = filled & !x %in% unlist(def$allowed_values),
+      # TDWG Boolean Controlled Vocabulary: lowercase true/false only
+      boolean = filled & !x %in% c("true", "false"),
       rep(FALSE, n))
     if (any(bad)) {
       msg <- switch(def$type,
         number = std_msg("type_number", lang, name),
         date = std_msg("type_date", lang, name),
-        enum = std_msg("enum", lang, name, paste(unlist(def$allowed_values), collapse = ", ")))
+        enum = std_msg("enum", lang, name, paste(unlist(def$allowed_values), collapse = ", ")),
+        boolean = std_msg("type_boolean", lang, name))
       add("error", name, paste0("type_", def$type), which(bad), msg)
     }
   }

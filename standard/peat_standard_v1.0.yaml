@@ -9,7 +9,8 @@
 #   `changes:` key pointing to the change ids; the published wording is kept in
 #   `changes[].as_published` so nothing from v1.0 is lost.
 # - Data valid under v1.0 stays valid here, except that verticalDatum is now
-#   required whenever surfaceElevation is given (change C5).
+#   required whenever surfaceElevation is given (change C5), and that the Yes/No
+#   attributes take true/false (change C7; Yes -> true, No -> false).
 # - `requirement` is a normalised level: required / conditional / desirable / optional.
 # - `type` and `unit` are NOT stated as fields in the standard; they are inferred
 #   from the descriptions to help with validation and should be treated as such.
@@ -37,7 +38,7 @@ standard:
 
 profile:
   name: Corrected machine-readable profile of v1.0
-  profile_version: "1.0-corr.1"
+  profile_version: "1.0-corr.2"
   date: "2026-10-09"
   based_on_version: "1.0"
 
@@ -94,6 +95,19 @@ changes:
     as_published: "...given in geodeticDatum of the geographic centre..."
     corrected: "...given in geodeticDatum) of the geographic centre..."
     rationale: Typo; brings the wording in line with latitude.
+  - id: C7
+    fields: [peatPresence, probeReachedBottom]
+    what: >-
+      Yes/No values replaced with the TDWG Boolean Controlled Vocabulary
+      (true/false) [10]; type changed from enum to boolean.
+    as_published: "Yes, No"
+    corrected: "true, false"
+    rationale: >-
+      TDWG recommends the lowercase, non-localised values true and false for
+      Boolean terms in tabular data files, so that Darwin Core tools and other
+      software can read them without a lookup table. Labels such as "Yes" or "Ja"
+      belong in user interfaces, not in the data. The mapping is one-to-one
+      (Yes -> true, No -> false), so v1.0 data convert without loss.
 
 peat_data:
   file_format:
@@ -344,14 +358,15 @@ peat_data:
       dwc_iri: null
       requirement: conditional
       requirement_text: Required if surfacePeatDepth not provided
-      type: enum
+      type: boolean
       unit: null
-      allowed_values: ["Yes", "No"]
+      allowed_values: ["true", "false"]
       description: >-
         Alternative to surfacePeatDepth, providing a simple indication of whether
         peat was present at the location. The peatDepthRemarks attribute may be
         used for further detail, e.g. "Visual check".
-      example: "Yes"
+      example: "true"
+      changes: [C7]
 
     - name: buriedPeatStartDepth
       term_definition: measurementValue
@@ -448,18 +463,18 @@ peat_data:
       dwc_iri: null
       requirement: required
       requirement_text: Required
-      type: enum
+      type: boolean
       unit: null
-      allowed_values: ["Yes", "No"]
+      allowed_values: ["true", "false"]
       description: >-
         Was the base of the peat layer(s) reached, e.g. was probe long enough to
         measure the full depth of peat? As opposed to suspecting that peat
-        continued to lower depths that could not be measured. "No" means that the
-        full depth of peat was not measured, and hence the surfacePeatDepth
-        recorded is a minimum value only. "No" should also be used if the surveyor
-        was unsure.
-      example: "Yes"
-      changes: [C2]
+        continued to lower depths that could not be measured. "false" means that
+        the full depth of peat was not measured, and hence the surfacePeatDepth
+        recorded is a minimum value only. "false" should also be used if the
+        surveyor was unsure.
+      example: "true"
+      changes: [C2, C7]
 
     - name: peatDepthRemarks
       term_definition: measurementRemarks
@@ -769,3 +784,5 @@ references:
   "7": "Batjes, N., 'International' soil standards, ISRIC — World Soil Information, https://www.isric.org/international-soil-standards"
   "8": "Peatland Code, v1.2, April 2022, IUCN UK National Committee."
   "9": "Nature for Climate Peatland Grant Scheme: Restoration Grant, Guide for Applicants 2023. February 2023, v3.1 Draft."
+  # Added with change C7 (not in the published v1.0)
+  "10": "Biodiversity Information Standards (TDWG). TDWG Boolean Controlled Vocabulary. http://rs.tdwg.org/boolean/values/ (list of terms: https://tag.tdwg.org/boolean/; best practices: https://tag.tdwg.org/guides/boolean/)"
