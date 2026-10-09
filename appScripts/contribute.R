@@ -522,9 +522,17 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
       bottom = input$bottom
     ))
 
+    # Reactives and observers below call req(has_points()) first and evaluate
+    # reactives into local variables before passing them on. In the full app,
+    # raster makes nrow(), %in%, as.data.frame() etc. S4 generics, and S4
+    # dispatch turns a quiet req() stop inside their arguments into a real
+    # error that ends the session.
     records <- reactive({
       req(has_points())
-      apply_edits(standardize_points(points(), answers(), std), edits())
+      pts <- points()
+      ans <- answers()
+      r <- standardize_points(pts, ans, std)
+      apply_edits(r, edits())
     })
 
     # The licence list offers profile choices: NLOD 2.0 is written as "Other" + rights
@@ -537,7 +545,9 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
     })
 
     meta_answers <- reactive({
+      req(has_points())
       lic <- license_terms()
+      r <- records()
       m <- list(
         title = input$title,
         organizationName = input$organizationName,
@@ -549,17 +559,30 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
         geographicDescription = input$geographicDescription
       )
       # Drafts stand in until the check step has shown its text boxes
-      m$methods <- input$methods %||% draft_methods(answers(), records(), std, lang())
-      m$bibliographicCitation <- input$bibliographicCitation %||% draft_citation(m, records())
+      if (is.null(input$methods)) {
+        ans <- answers()
+        m$methods <- draft_methods(ans, r, std, lang())
+      } else {
+        m$methods <- input$methods
+      }
+      m$bibliographicCitation <- input$bibliographicCitation %||% draft_citation(m, r)
       m
     })
 
-    metadata <- reactive(build_metadata(meta_answers(), records(), std))
+    metadata <- reactive({
+      req(has_points())
+      m <- meta_answers()
+      r <- records()
+      build_metadata(m, r, std)
+    })
 
     issues <- reactive({
+      req(has_points())
       l <- lang()
-      rbind(validate_against_standard(records(), std, "peat_data", l),
-            validate_against_standard(metadata(), std, "metadata", l))
+      r <- records()
+      m <- metadata()
+      rbind(validate_against_standard(r, std, "peat_data", l),
+            validate_against_standard(m, std, "metadata", l))
     })
 
     #################
@@ -626,12 +649,17 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
         iv$enable()
         if (!iv$is_valid()) return(tr("Noen felt må fylles ut eller rettes."))
       }
-      if (s == "review" && asks_bottom() && identical(input$bottom, "some") &&
-          !any(records()$probeReachedBottom %in% "No")) {
-        return(tr("Du svarte at dere ikke nådde bunnen i noen punkter, men ingen punkter er merket. Velg punktene og trykk «Nådde ikke bunnen», eller endre svaret i steg 2."))
+      if (s == "review" && asks_bottom() && identical(input$bottom, "some")) {
+        r <- records()
+        if (!any(r$probeReachedBottom %in% "No")) {
+          return(tr("Du svarte at dere ikke nådde bunnen i noen punkter, men ingen punkter er merket. Velg punktene og trykk «Nådde ikke bunnen», eller endre svaret i steg 2."))
+        }
       }
-      if (s == "validate" && any(issues()$level == "error")) {
-        return(tr("Noe må rettes før du kan laste ned. Gå tilbake og rett feltene nedenfor."))
+      if (s == "validate") {
+        iss <- issues()
+        if (any(iss$level == "error")) {
+          return(tr("Noe må rettes før du kan laste ned. Gå tilbake og rett feltene nedenfor."))
+        }
       }
       NULL
     }
@@ -681,8 +709,12 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
 
     output$nav <- renderUI({
       i <- match(step(), contribute_steps)
-      can_next <- i < length(contribute_steps) && ready() &&
-        !(step() == "validate" && any(issues()$level == "error"))
+      blocked <- FALSE
+      if (step() == "validate" && ready()) {
+        iss <- issues()
+        blocked <- any(iss$level == "error")
+      }
+      can_next <- i < length(contribute_steps) && ready() && !blocked
       tagList(
         if (i > 1) actionButton(ns("back"), tr("Tilbake"), icon = icon("arrow-left")),
         if (can_next)
@@ -799,7 +831,8 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
     output$step_review <- renderUI({
       req(has_points())
       must_mark <- asks_bottom() && identical(input$bottom, "some")
-      n_no <- sum(records()$probeReachedBottom %in% "No")
+      r <- records()
+      n_no <- sum(r$probeReachedBottom %in% "No")
       extras <- contribute_extra_columns(points(), std)
       tagList(
         h3(tr("Se over punktene")),
@@ -893,7 +926,9 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
 
     table_proxy <- DT::dataTableProxy("table")
     observe({
-      DT::replaceData(table_proxy, review_data(), rownames = FALSE, resetPaging = FALSE,
+      req(has_points())
+      d <- review_data()
+      DT::replaceData(table_proxy, d, rownames = FALSE, resetPaging = FALSE,
                       clearSelection = "none")
     })
 
@@ -996,12 +1031,16 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
 
     # Recolour after edits (and redraw the selection on top), or redraw the selection
     observe({
+      req(has_points())
       r <- records()
-      draw_selected(draw_points(leafletProxy("map"), r), r, isolate(selected()))
+      rows <- isolate(selected())
+      draw_selected(draw_points(leafletProxy("map"), r), r, rows)
     })
     observe({
+      req(has_points())
       rows <- selected()
-      draw_selected(leafletProxy("map"), isolate(records()), rows)
+      r <- isolate(records())
+      draw_selected(leafletProxy("map"), r, rows)
     })
 
     #################
@@ -1042,13 +1081,15 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
     #################
     output$step_validate <- renderUI({
       req(has_points())
-      s <- summarise_issues(issues())
+      r <- records()
+      iss <- issues()
+      s <- summarise_issues(iss)
       n_err <- sum(s$level == "error")
       tagList(
         h3(tr("Kontroll")),
         if (n_err == 0) {
           div(class = "alert alert-success",
-              sprintf(tr("Alle %s punkter følger standarden. Du kan gå videre til nedlasting."), nrow(records())))
+              sprintf(tr("Alle %s punkter følger standarden. Du kan gå videre til nedlasting."), nrow(r)))
         } else {
           div(class = "alert alert-danger",
               tr("Noe må rettes før du kan laste ned. Gå tilbake og rett feltene nedenfor."))
@@ -1070,8 +1111,12 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
     output$validate_drafts <- renderUI({
       req(has_points(), step() == "validate")
       l <- lang()
-      new <- isolate(list(methods = draft_methods(answers(), records(), std, l),
-                          bibliographicCitation = draft_citation(meta_answers(), records())))
+      new <- isolate({
+        r <- records()
+        ans <- answers()
+        m <- meta_answers()
+        list(methods = draft_methods(ans, r, std, l), bibliographicCitation = draft_citation(m, r))
+      })
       value <- function(name) {
         cur <- isolate(input[[name]])
         if (is.null(cur) || is_blank(cur) || identical(cur, isolate(drafts[[name]]))) new[[name]] else cur
@@ -1107,7 +1152,8 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
 
     output$preview <- DT::renderDT({
       req(has_points(), step() == "validate")
-      d <- as_display(records(), std)
+      r <- records()
+      d <- as_display(r, std)
       DT::datatable(d, rownames = FALSE, selection = "none",
                     container = dt_header(names(d), column_tips(names(d))),
                     options = list(pageLength = 10, scrollX = TRUE, dom = "tip",
@@ -1119,12 +1165,13 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
     #################
     output$step_download <- renderUI({
       req(has_points())
+      r <- records()
       tagList(
         h3(tr("Last ned")),
         p(tr("Zip-filen inneholder:")),
         tags$ul(
           tags$li(tags$code("peat_data.csv"), " – ",
-                  sprintf(tr("%s punkter, én rad per måling"), nrow(records()))),
+                  sprintf(tr("%s punkter, én rad per måling"), nrow(r))),
           tags$li(tags$code("metadata.csv"), " – ", tr("beskrivelse av datasettet")),
           tags$li(tags$code("README.txt"), " – ", tr("hvilken standard og profil filene følger"))
         ),
@@ -1137,10 +1184,13 @@ mod_contribute_server <- function(id, points, shape, upload_state, lang,
     output$download <- downloadHandler(
       filename = function() paste0("peat_depths_standard_", Sys.Date(), ".zip"),
       content = function(file) {
-        if (any(issues()$level == "error")) stop("The data do not pass validation.")
+        iss <- issues()
+        if (any(iss$level == "error")) stop("The data do not pass validation.")
+        r <- records()
+        m <- metadata()
         dir <- tempfile("contribute_")
         on.exit(unlink(dir, recursive = TRUE), add = TRUE)
-        paths <- write_standard_package(records(), metadata(), std, dir)
+        paths <- write_standard_package(r, m, std, dir)
         utils::zip(zipfile = file, files = paths, flags = "-j9X")
       },
       contentType = "application/zip"
