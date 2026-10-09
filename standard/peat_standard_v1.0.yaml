@@ -1,0 +1,771 @@
+# Data Exchange Standard for Peat Surveys, v1.0 (England Peat Map Project)
+# Prince, M. 2023. Data Exchange Standard for Peat Surveys. v1.0. Natural England.
+# Source published under the Open Government Licence v3.0.
+#
+# Transcription notes
+# - `description`, `example`, `requirement_text` and `allowed_values` are verbatim
+#   from the PDF tables (line-break hyphenation and page splits repaired), EXCEPT
+#   where listed under `changes` below. Each changed or added field carries a
+#   `changes:` key pointing to the change ids; the published wording is kept in
+#   `changes[].as_published` so nothing from v1.0 is lost.
+# - Data valid under v1.0 stays valid here, except that verticalDatum is now
+#   required whenever surfaceElevation is given (change C5).
+# - `requirement` is a normalised level: required / conditional / desirable / optional.
+# - `type` and `unit` are NOT stated as fields in the standard; they are inferred
+#   from the descriptions to help with validation and should be treated as such.
+# - `dwc_iri` is built from the Darwin Core namespace (http://rs.tdwg.org/dwc/terms/);
+#   the PDF hyperlinks themselves were not readable.
+# - Cross-field rules (conditional requirements, location priority) are encoded
+#   separately under `peat_data.rules`.
+
+standard:
+  title: Data Exchange Standard for Peat Surveys
+  project: England Peat Map Project
+  publisher: Natural England
+  version: "1.0"
+  issued: "2023-06-05"
+  author: Mike Prince
+  citation: "Prince, M. 2023. Data Exchange Standard for Peat Surveys. v1.0. Natural England."
+  licence: Open Government Licence v3.0
+  requirement_levels:
+    required: Mandatory to make a record useable.
+    desirable: Not necessary but would improve the quality of a record.
+    optional: Not always appropriate, but some surveys may desire them.
+  files:
+    - Peat Data Records forming the dataset (CSV per RFC 4180, or GIS vector features dataset)
+    - Metadata file describing the dataset (CSV per RFC 4180)
+
+profile:
+  name: Corrected machine-readable profile of v1.0
+  profile_version: "1.0-corr.1"
+  date: "2026-10-09"
+  based_on_version: "1.0"
+
+changes:
+  - id: C1
+    fields: [easting, northing]
+    rule: easting_northing_crs
+    what: EPSG code for British National Grid corrected.
+    as_published: "British National Grid OSGB36 (EPSG:2770)"
+    corrected: "British National Grid OSGB36 (EPSG:27700)"
+    rationale: EPSG:2770 is an unrelated CRS; OSGB36 / British National Grid is EPSG:27700.
+  - id: C2
+    fields: [probeReachedBottom]
+    what: Reference to non-existent attribute "peatDepth" replaced with surfacePeatDepth (also the label used in Figure 1).
+    as_published: "...and hence the peatDepth recorded is a minimum value only."
+    corrected: "...and hence the surfacePeatDepth recorded is a minimum value only."
+    rationale: The attribute is named surfacePeatDepth everywhere else in the standard.
+  - id: C3
+    fields: [easting, northing, verbatimSRS]
+    what: >-
+      Darwin Core mapping of easting/northing changed from verbatimLatitude/verbatimLongitude
+      to verbatimCoordinates; new field verbatimSRS added.
+    as_published: "easting -> verbatimLatitude; northing -> verbatimLongitude"
+    corrected: "easting + northing -> verbatimCoordinates (as '<easting> <northing>'); SRS in verbatimSRS"
+    rationale: >-
+      verbatimLatitude/verbatimLongitude are for latitudes and longitudes. Darwin Core
+      holds projected coordinates in the single term verbatimCoordinates, with the
+      reference system in verbatimSRS. The v1.0 text itself proposes adding verbatimSRS
+      so eastings and northings can be used outside Great Britain. verbatimSRS defaults
+      to EPSG:27700 when absent, so v1.0 data remain valid.
+  - id: C4
+    fields: [geodeticDatum]
+    what: Example changed to an EPSG code; Darwin Core best-practice sentence added to the description.
+    as_published: "WGS: 1984"
+    corrected: "EPSG:4326"
+    rationale: >-
+      "WGS: 1984" is not a recognisable datum identifier. Darwin Core recommends the
+      EPSG code of the SRS where known.
+  - id: C5
+    fields: [surfaceElevation, verticalDatum]
+    what: >-
+      surfaceElevation mapped to Darwin Core minimumElevationInMeters /
+      maximumElevationInMeters (was measurementValue) and tied to a reference level;
+      new field verticalDatum added, required when surfaceElevation is given.
+    as_published: "surfaceElevation -> measurementValue; no reference level"
+    corrected: "surfaceElevation -> minimum/maximumElevationInMeters (cm / 100); reference level in verticalDatum"
+    rationale: >-
+      An elevation is meaningless without its reference surface. Darwin Core's
+      verticalDatum is defined for exactly this and pairs with its elevation terms.
+      The value stays in centimetres for compatibility with v1.0 data.
+  - id: C6
+    fields: [longitude]
+    what: Missing closing parenthesis added to the description.
+    as_published: "...given in geodeticDatum of the geographic centre..."
+    corrected: "...given in geodeticDatum) of the geographic centre..."
+    rationale: Typo; brings the wording in line with latitude.
+
+peat_data:
+  file_format:
+    allowed: [CSV, GIS vector features dataset]
+    notes:
+      - The first record is a header record containing a list of field names, including at a minimum the Required attributes. Desirable attributes, if not used for any individual record within the dataset, may be omitted.
+      - Attribute order is recommended to follow the attribute table, but this is not mandatory.
+      - CSV files shall conform to RFC 4180. Excel-produced CSV should be checked for compliance.
+      - Shapefiles typically limit text attributes to 255 characters.
+      - Data are not restricted to the attributes listed; others may be defined to suit a particular survey's needs.
+
+  attributes:
+    - name: recordDate
+      term_definition: eventDate
+      dwc_iri: http://rs.tdwg.org/dwc/terms/eventDate
+      requirement: required
+      requirement_text: Required
+      type: date
+      unit: null
+      allowed_values: null
+      description: Date (and, optionally, time) that peat depth measurement was taken, typically in format YYYY-MM-DD.
+      example: "2021-10-04"
+
+    - name: surveyor
+      term_definition: recordedBy
+      dwc_iri: http://rs.tdwg.org/dwc/terms/recordedBy
+      requirement: required
+      requirement_text: Required
+      type: string
+      unit: null
+      allowed_values: null
+      description: >-
+        Name or names of persons, groups, or organisations who recorded the peat
+        depth measurement. Note that personal data must be managed in accordance
+        with the principles of the Data Protection Act 2018 [6] and/or any
+        subsequent legal provisions.
+      example: "Pete Marsh"
+
+    - name: institution
+      term_definition: institutionCode
+      dwc_iri: http://rs.tdwg.org/dwc/terms/institutionCode
+      requirement: required
+      requirement_text: Required
+      type: string
+      unit: null
+      allowed_values: null
+      description: >-
+        The name (or acronym) in use by the institution having custody of the
+        particular record. Full names are recommended to avoid potential
+        ambiguities.
+      example: "Defra"
+
+    - name: location
+      term_definition: location
+      dwc_iri: http://rs.tdwg.org/dwc/terms/Location
+      requirement: desirable
+      requirement_text: Desirable
+      type: string
+      unit: null
+      allowed_values: null
+      description: Spatial region or named place.
+      example: "New Forest National Park"
+
+    - name: country
+      term_definition: country
+      dwc_iri: http://rs.tdwg.org/dwc/terms/country
+      requirement: desirable
+      requirement_text: Desirable
+      type: string
+      unit: null
+      allowed_values: null
+      description: Country or major administrative unit in which the Location occurs.
+      example: "England"
+
+    - name: latitude
+      term_definition: decimalLatitude
+      dwc_iri: http://rs.tdwg.org/dwc/terms/decimalLatitude
+      requirement: conditional
+      requirement_text: Required if gridReference, and easting and northing, not provided
+      type: number
+      unit: decimal degrees
+      allowed_values: null
+      description: >-
+        The geographic latitude (in decimal degrees, using the spatial reference
+        system given in geodeticDatum) of the geographic centre from where the
+        measurement was taken.
+      example: "50.955177"
+
+    - name: longitude
+      term_definition: decimalLongitude
+      dwc_iri: http://rs.tdwg.org/dwc/terms/decimalLongitude
+      requirement: conditional
+      requirement_text: Required if gridReference, and easting and northing, not provided
+      type: number
+      unit: decimal degrees
+      allowed_values: null
+      description: >-
+        The geographic longitude (in decimal degrees, using the spatial reference
+        system given in geodeticDatum) of the geographic centre from where the
+        measurement was taken.
+      example: "-1.7509012"
+      changes: [C6]
+
+    - name: coordinateUncertainty
+      term_definition: coordinateUncertaintyInMeters
+      dwc_iri: http://rs.tdwg.org/dwc/terms/coordinateUncertaintyInMeters
+      requirement: desirable
+      requirement_text: Desirable if latitude and longitude provided
+      type: number
+      unit: m
+      allowed_values: null
+      description: >-
+        The horizontal distance, i.e. radius, (in metres) from the given latitude
+        and longitude describing the smallest circle containing the whole of the
+        record location. This can allow for GPS inaccuracy. Leave the value empty
+        if the uncertainty is unknown and cannot be estimated, or is not
+        applicable (because there are no coordinates).
+      example: "10"
+
+    - name: geodeticDatum
+      term_definition: geodeticDatum
+      dwc_iri: http://rs.tdwg.org/dwc/terms/geodeticDatum
+      requirement: conditional
+      requirement_text: Required if latitude and longitude provided
+      type: string
+      unit: null
+      allowed_values: null
+      description: >-
+        The ellipsoid, geodetic datum, or spatial reference system (SRS) upon
+        which the geographic coordinates given in latitude and longitude are
+        based. Recommended best practice is to use the EPSG code of the SRS, if
+        known (e.g. EPSG:4326 for WGS 84).
+      example: "EPSG:4326"
+      changes: [C4]
+
+    - name: gridReference
+      term_definition: null
+      dwc_iri: null
+      requirement: conditional
+      requirement_text: Required if latitude and longitude, and easting and northing, not provided
+      type: string
+      unit: null
+      allowed_values: null
+      description: >-
+        Location of the record using the Ordnance Survey National Grid reference
+        system [footnote 2]. Recommended precision is for at least eight-figure
+        grid references, i.e. 10m x 10m.
+      example: "SU 33140 07406"
+      footnotes: [fn2]
+
+    - name: easting
+      term_definition: verbatimCoordinates
+      dwc_iri: http://rs.tdwg.org/dwc/terms/verbatimCoordinates
+      dwc_note: >-
+        Component of verbatimCoordinates. For Darwin Core export, combine as
+        "<easting> <northing>" and give the reference system in verbatimSRS.
+      requirement: conditional
+      requirement_text: Required if latitude and longitude, and gridReference, not provided
+      type: number
+      unit: m
+      allowed_values: null
+      description: >-
+        Easting of the record, in metres, using OSGB36 National Grid, or the
+        projected reference system given in verbatimSRS.
+      example: "433152"
+      changes: [C1, C3]
+
+    - name: northing
+      term_definition: verbatimCoordinates
+      dwc_iri: http://rs.tdwg.org/dwc/terms/verbatimCoordinates
+      dwc_note: >-
+        Component of verbatimCoordinates. For Darwin Core export, combine as
+        "<easting> <northing>" and give the reference system in verbatimSRS.
+      requirement: conditional
+      requirement_text: Required if latitude and longitude, and gridReference, not provided
+      type: number
+      unit: m
+      allowed_values: null
+      description: >-
+        Northing of the record, in metres, using OSGB36 National Grid, or the
+        projected reference system given in verbatimSRS.
+      example: "107413"
+      changes: [C1, C3]
+
+    - name: verbatimSRS
+      term_definition: verbatimSRS
+      dwc_iri: http://rs.tdwg.org/dwc/terms/verbatimSRS
+      requirement: desirable
+      requirement_text: Desirable if easting and northing provided; if absent, EPSG:27700 is assumed
+      type: string
+      unit: null
+      allowed_values: null
+      default: "EPSG:27700"
+      description: >-
+        The spatial reference system (SRS) of easting and northing. Recommended
+        best practice is to use the EPSG code, e.g. EPSG:27700 for British
+        National Grid, or EPSG:25833 for ETRS89 / UTM zone 33N.
+      example: "EPSG:27700"
+      added: true
+      changes: [C3]
+
+    - name: locationRemarks
+      term_definition: locationRemarks
+      dwc_iri: http://rs.tdwg.org/dwc/terms/locationRemarks
+      requirement: desirable
+      requirement_text: Desirable
+      type: string
+      unit: null
+      allowed_values: null
+      description: >-
+        Comments or notes about the specific location of this measurement.
+        Particular surveys may consider use of the IUCN Peatland Code [8]
+        Condition Category for this, e.g. "Near Natural", "Modified"
+      example: "In gully"
+
+    - name: surfacePeatDepth
+      term_definition: measurementValue
+      dwc_iri: http://rs.tdwg.org/dwc/terms/measurementValue
+      requirement: conditional
+      requirement_text: Required if peatPresence not provided
+      type: number
+      unit: cm
+      allowed_values: null
+      description: >-
+        Maximum depth of surface peat (organic soil depth), measured from the
+        surface, specified in centimetres. Depth may be zero if there is no
+        surface peat.
+      example: "143"
+
+    - name: peatDepthResolution
+      term_definition: measurementAccuracy
+      dwc_iri: http://rs.tdwg.org/dwc/terms/measurementAccuracy
+      requirement: desirable
+      requirement_text: Desirable
+      type: string
+      unit: null
+      allowed_values: null
+      description: >-
+        The description of the potential error, if any, associated with the
+        surfacePeatDepth measurement, e.g. was peat depth measured to the nearest
+        1cm, or 10cm, or was the bottom difficult to ascertain with certainty?
+        peatDepthRemarks should be used to provide further details, including any
+        difference with resolution for buried peat measurements.
+      example: "Nearest 1cm"
+
+    - name: peatPresence
+      term_definition: null
+      dwc_iri: null
+      requirement: conditional
+      requirement_text: Required if surfacePeatDepth not provided
+      type: enum
+      unit: null
+      allowed_values: ["Yes", "No"]
+      description: >-
+        Alternative to surfacePeatDepth, providing a simple indication of whether
+        peat was present at the location. The peatDepthRemarks attribute may be
+        used for further detail, e.g. "Visual check".
+      example: "Yes"
+
+    - name: buriedPeatStartDepth
+      term_definition: measurementValue
+      dwc_iri: http://rs.tdwg.org/dwc/terms/measurementValue
+      requirement: optional
+      requirement_text: Optional
+      type: number
+      unit: cm
+      allowed_values: null
+      description: >-
+        Start point of buried peat layer from the surface, i.e. depth first
+        detected, specified in centimetres.
+      example: "220"
+      footnotes: [fn1]
+
+    - name: buriedPeatEndDepth
+      term_definition: measurementValue
+      dwc_iri: http://rs.tdwg.org/dwc/terms/measurementValue
+      requirement: optional
+      requirement_text: Optional
+      type: number
+      unit: cm
+      allowed_values: null
+      description: >-
+        End point of buried peat layer from the surface, i.e. maximum depth,
+        specified in centimetres.
+      example: "315"
+      footnotes: [fn1]
+
+    - name: surfaceElevation
+      term_definition: minimumElevationInMeters, maximumElevationInMeters
+      dwc_iri: http://rs.tdwg.org/dwc/terms/minimumElevationInMeters
+      dwc_note: >-
+        Stored in centimetres. For Darwin Core export, divide by 100 and write the
+        same value to both minimumElevationInMeters and maximumElevationInMeters;
+        the reference level goes in verticalDatum.
+      requirement: optional
+      requirement_text: Optional
+      type: number
+      unit: cm
+      allowed_values: null
+      description: >-
+        Elevation of the ground surface, specified in centimetres, above the
+        reference level given in verticalDatum. Useful in areas such as degrading
+        or eroding peatlands, where elevation could change over time.
+      example: "1050"
+      changes: [C5]
+
+    - name: verticalDatum
+      term_definition: verticalDatum
+      dwc_iri: http://rs.tdwg.org/dwc/terms/verticalDatum
+      requirement: conditional
+      requirement_text: Required if surfaceElevation provided
+      type: string
+      unit: null
+      allowed_values: null
+      description: >-
+        The vertical datum (reference level) upon which surfaceElevation is based.
+        Recommended best practice is to use the EPSG code of the vertical
+        reference system, e.g. EPSG:5701 for Ordnance Datum Newlyn or EPSG:5941
+        for NN2000 (Norway). For heights relative to a local benchmark, describe
+        the benchmark here.
+      example: "EPSG:5701"
+      added: true
+      changes: [C5]
+
+    - name: probeType
+      term_definition: null
+      dwc_iri: null
+      requirement: desirable
+      requirement_text: Desirable
+      type: enum
+      unit: null
+      allowed_values:
+        - peat probe
+        - avalanche probe
+        - cable rod
+        - drainage rod
+        - threaded rod
+        - peat borer
+        - soil corer
+        - open end corer
+        - stick
+        - other
+      description: >-
+        Type of peat probe or other sampling method. The "other" option may be
+        used for devices used that are not actually peat probes, e.g. surface
+        level rods, supported by peatDepthRemarks for additional details.
+      example: "avalanche probe"
+      footnotes: [fn3]
+
+    - name: probeReachedBottom
+      term_definition: null
+      dwc_iri: null
+      requirement: required
+      requirement_text: Required
+      type: enum
+      unit: null
+      allowed_values: ["Yes", "No"]
+      description: >-
+        Was the base of the peat layer(s) reached, e.g. was probe long enough to
+        measure the full depth of peat? As opposed to suspecting that peat
+        continued to lower depths that could not be measured. "No" means that the
+        full depth of peat was not measured, and hence the surfacePeatDepth
+        recorded is a minimum value only. "No" should also be used if the surveyor
+        was unsure.
+      example: "Yes"
+      changes: [C2]
+
+    - name: peatDepthRemarks
+      term_definition: measurementRemarks
+      dwc_iri: http://rs.tdwg.org/dwc/terms/measurementRemarks
+      requirement: desirable
+      requirement_text: Desirable
+      type: string
+      unit: null
+      allowed_values: null
+      description: >-
+        Comments or notes on this peat depth measurement. Can include an
+        assessment of confidence, e.g. if it is difficult to determine the exact
+        bottom of the organic layer, density of substrate preventing recording a
+        deeper depth using peat probes etc.
+      example: "Average of 3 separate field measurements"
+
+  footnotes:
+    fn1: >-
+      For example, this specification includes the optional attributes
+      buriedPeatStartDepth and buriedPeatEndDepth. A particular survey could decide
+      to extend this and introduce buriedPeatStartDepth1, buriedPeatEndDepth1,
+      buriedPeatStartDepth2, buriedPeatEndDepth2 etc., if it required to record
+      multiple buried peat layers. Similarly, the Nature for Climate Peatland Grant
+      Scheme [9] uses a Peat Depth template which includes additional attributes
+      such as Site ID and Photo ID, which could easily be supported by adopting and
+      extending this standard.
+    fn2: >-
+      See https://getoutside.ordnancesurvey.co.uk/guides/beginners-guide-to-grid-references/
+      for an introduction to Ordnance Survey grid references.
+    fn3: Russian borer/auger
+
+  # Machine-readable versions of the conditional requirements and the
+  # "Location Specification" section. Derived from the text, not a table in the PDF.
+  rules:
+    - id: location_one_of
+      type: at_least_one_group_complete
+      groups:
+        - [latitude, longitude]
+        - [gridReference]
+        - [easting, northing]
+      text: >-
+        Geographic location may be specified as latitude and longitude, as an
+        Ordnance Survey National Grid reference, or as OS National Grid eastings
+        and northings.
+    - id: location_priority
+      type: priority
+      order:
+        - [latitude, longitude]
+        - [gridReference]
+        - [easting, northing]
+      text: >-
+        Listed in order of priority so, if more than one option is supplied for
+        the same record and there are any discrepancies, only the highest priority
+        one needs to be considered.
+    - id: datum_with_latlon
+      type: required_if_present
+      field: geodeticDatum
+      if_present: [latitude, longitude]
+    - id: srs_with_easting_northing
+      type: default_if_absent
+      field: verbatimSRS
+      if_present: [easting, northing]
+      default: "EPSG:27700"
+      changes: [C3]
+    - id: vertical_datum_with_elevation
+      type: required_if_present
+      field: verticalDatum
+      if_present: [surfaceElevation]
+      changes: [C5]
+    - id: uncertainty_with_latlon
+      type: desirable_if_present
+      field: coordinateUncertainty
+      if_present: [latitude, longitude]
+    - id: depth_or_presence
+      type: at_least_one_present
+      fields: [surfacePeatDepth, peatPresence]
+    - id: easting_northing_crs
+      type: crs
+      fields: [easting, northing]
+      crs: "EPSG:27700"
+      text: >-
+        Eastings and northings are assumed to be for the British National Grid
+        OSGB36 (EPSG:27700) unless another projected reference system is given in
+        verbatimSRS.
+      changes: [C1, C3]
+    - id: depths_from_surface
+      type: note
+      text: >-
+        Depth attributes in this standard are measured from the surface (Figure 1,
+        where the label "peatDepth" corresponds to surfacePeatDepth).
+      changes: [C2]
+
+metadata:
+  file_format:
+    allowed: [CSV]
+    notes:
+      - The first record is a header record containing a list of field names, including at a minimum the Required metadata terms. Desirable terms, if not used, may be omitted.
+      - Term order is recommended to follow the metadata table, but this is not mandatory.
+      - Files shall conform to RFC 4180.
+      - Metadata are not restricted to the terms listed; others may be defined to suit a particular survey's needs.
+      - Term names follow American spellings (license, organization) for consistency with Darwin Core and other referenced standards.
+      - Adapted, with permission, from the NBN Atlas metadata file [3].
+
+  terms:
+    - name: title
+      requirement: required
+      requirement_text: Required
+      type: string
+      allowed_values: null
+      description: >-
+        The title by which the dataset is commonly known. Best practice is to
+        include the data subject, date range and geographic extent.
+      example: "Peat Depths for New Forest September 2020"
+
+    - name: organizationName
+      requirement: required
+      requirement_text: Required
+      type: string
+      allowed_values: null
+      description: Name of organisation or group
+      example: "Defra"
+
+    - name: abstract
+      requirement: required
+      requirement_text: Required
+      type: string
+      allowed_values: null
+      description: >-
+        General description of the dataset. This should summarise the overall
+        project for which this data was collected, and include a mention of the
+        general habitat. See also additionalInfo, purpose and methods.
+      example: "Peat depths from survey carried out on New Forest by Defra in September 2020."
+
+    - name: additionalInfo
+      requirement: desirable
+      requirement_text: Desirable
+      type: string
+      allowed_values: null
+      description: >-
+        Details on where additional information about the data can be found. For
+        example, this could refer to a supplementary report by your organisation.
+      example: "Survey data included in Assessing Carbon Stocks within New Forest Peat www.example.com/newforest-peat.pdf"
+
+    - name: license
+      requirement: required
+      requirement_text: Required
+      type: enum
+      allowed_values: [CC0, CC-BY, CC-BY-NC, OGL, NCGL, Other]
+      description: >-
+        The licence that should be applied to all records in the dataset. Should
+        there be particular sensitivities in the dataset that prevent its
+        publication using one of the named licenses, then an "Other" licence would
+        be appropriate with the specific usage restrictions detailed there.
+      example: "CC-BY"
+
+    - name: rights
+      requirement: desirable
+      requirement_text: Desirable
+      type: string
+      allowed_values: null
+      description: >-
+        Additional information about copyright or usage rights, in particular for
+        "Other" licences.
+      example: null
+
+    - name: bibliographicCitation
+      requirement: desirable
+      requirement_text: Desirable
+      type: string
+      allowed_values: null
+      description: >-
+        The text that should be used when the dataset is cited in publications and
+        reports, to acknowledge its use.
+      example: null
+
+    - name: geographicDescription
+      requirement: desirable
+      requirement_text: Desirable
+      type: string
+      allowed_values: null
+      description: >-
+        Description of the geographic extent of the dataset. For survey-based data
+        this may be a larger geographic area than the occurrence of records within
+        the dataset, e.g. designated site name, county.
+      example: "New Forest National Park"
+
+    - name: westBoundingCoordinate
+      requirement: desirable
+      requirement_text: Desirable
+      type: number
+      allowed_values: null
+      description: Westernmost coordinate of data coverage
+      example: "-1.80"
+
+    - name: eastBoundingCoordinate
+      requirement: desirable
+      requirement_text: Desirable
+      type: number
+      allowed_values: null
+      description: Easternmost coordinate of data coverage
+      example: "-1.30"
+
+    - name: northBoundingCoordinate
+      requirement: desirable
+      requirement_text: Desirable
+      type: number
+      allowed_values: null
+      description: Northernmost bounding coordinate of data coverage
+      example: "51.30"
+
+    - name: southBoundingCoordinate
+      requirement: desirable
+      requirement_text: Desirable
+      type: number
+      allowed_values: null
+      description: Southernmost coordinate of data coverage
+      example: "50.70"
+
+    - name: temporalCoverageStartDate
+      requirement: desirable
+      requirement_text: Desirable
+      type: date
+      allowed_values: null
+      description: Earliest record date
+      example: "2020-09-19"
+
+    - name: temporalCoverageEndDate
+      requirement: desirable
+      requirement_text: Desirable
+      type: date
+      allowed_values: null
+      description: Latest record date
+      example: "2020-09-21"
+
+    - name: purpose
+      requirement: desirable
+      requirement_text: Desirable
+      type: string
+      allowed_values: null
+      description: >-
+        The purpose for which the records were originally collected and also,
+        where different, the reason for producing the dataset.
+      example: "Carbon monitoring across the New Forest OR Tree planting investigative survey"
+
+    - name: methods
+      requirement: desirable
+      requirement_text: Desirable
+      type: string
+      allowed_values: null
+      description: >-
+        A concise description of the methods and techniques used in the creation
+        of the dataset, including those used in data capture plus verification and
+        validation. Highlight any areas of uncertainty with regard to any aspect of
+        data capture and collation.
+      example: "Covered in detail in accompanying report."
+
+    - name: qualityControl
+      requirement: desirable
+      requirement_text: Desirable
+      type: string
+      allowed_values: null
+      description: >-
+        An assessment of the quality of data capture and/or the collated dataset as
+        a whole. Ascribe your general level of confidence in the data source,
+        processing, validation, and record collation.
+      example: null
+
+    - name: contactGivenName
+      requirement: desirable
+      requirement_text: Desirable
+      type: string
+      allowed_values: null
+      description: Dataset contact's first name
+      example: "Pete"
+
+    - name: contactSurname
+      requirement: desirable
+      requirement_text: Desirable
+      type: string
+      allowed_values: null
+      description: Dataset contact's surname
+      example: "Marsh"
+
+    - name: contactElectronicMailAddress
+      requirement: required
+      requirement_text: Required
+      type: string
+      allowed_values: null
+      description: Dataset contact's email
+      example: "pete.marsh@example.com"
+
+    - name: contactPhone
+      requirement: desirable
+      requirement_text: Desirable
+      type: string
+      allowed_values: null
+      description: Dataset contact's phone number
+      example: "0800 1234567"
+
+references:
+  "1": "England Peat Action Plan. May 2021. https://www.gov.uk/government/publications/england-peat-action-plan"
+  "2": "Darwin Core Maintenance Group. 2021. List of Darwin Core terms. Biodiversity Information Standards (TDWG). http://rs.tdwg.org/dwc/doc/list/"
+  "3": "National Biodiversity Atlas (NBN) Atlas (https://ror.org/00mcxye41) at http://www.nbnatlas.org. Accessed 30 September 2022."
+  "4": "Shafranovich, Y., \"Common Format and MIME Type for Comma-Separated Values (CSV) Files\", RFC 4180, DOI 10.17487/RFC4180, October 2005, https://datatracker.ietf.org/doc/html/rfc4180."
+  "5": "Wieczorek J, Bloom D, Guralnick R, Blum S, Döring M, et al. (2012) Darwin Core: An Evolving Community-Developed Biodiversity Data Standard. PLoS ONE 7(1): e29715. https://doi.org/10.1371/journal.pone.0029715"
+  "6": "Data Protection Act, 2018. Data Protection Act 2018. GOV.UK. https://www.gov.uk/government/collections/data-protection-act-2018"
+  "7": "Batjes, N., 'International' soil standards, ISRIC — World Soil Information, https://www.isric.org/international-soil-standards"
+  "8": "Peatland Code, v1.2, April 2022, IUCN UK National Committee."
+  "9": "Nature for Climate Peatland Grant Scheme: Restoration Grant, Guide for Applicants 2023. February 2023, v3.1 Draft."

@@ -1,0 +1,22 @@
+order,name,requirement,requirement_text,type,allowed_values,description,example
+1,title,required,Required,string,,"The title by which the dataset is commonly known. Best practice is to include the data subject, date range and geographic extent.",Peat Depths for New Forest September 2020
+2,organizationName,required,Required,string,,Name of organisation or group,Defra
+3,abstract,required,Required,string,,"General description of the dataset. This should summarise the overall project for which this data was collected, and include a mention of the general habitat. See also additionalInfo, purpose and methods.",Peat depths from survey carried out on New Forest by Defra in September 2020.
+4,additionalInfo,desirable,Desirable,string,,"Details on where additional information about the data can be found. For example, this could refer to a supplementary report by your organisation.",Survey data included in Assessing Carbon Stocks within New Forest Peat www.example.com/newforest-peat.pdf
+5,license,required,Required,enum,CC0|CC-BY|CC-BY-NC|OGL|NCGL|Other,"The licence that should be applied to all records in the dataset. Should there be particular sensitivities in the dataset that prevent its publication using one of the named licenses, then an ""Other"" licence would be appropriate with the specific usage restrictions detailed there.",CC-BY
+6,rights,desirable,Desirable,string,,"Additional information about copyright or usage rights, in particular for ""Other"" licences.",
+7,bibliographicCitation,desirable,Desirable,string,,"The text that should be used when the dataset is cited in publications and reports, to acknowledge its use.",
+8,geographicDescription,desirable,Desirable,string,,"Description of the geographic extent of the dataset. For survey-based data this may be a larger geographic area than the occurrence of records within the dataset, e.g. designated site name, county.",New Forest National Park
+9,westBoundingCoordinate,desirable,Desirable,number,,Westernmost coordinate of data coverage,-1.80
+10,eastBoundingCoordinate,desirable,Desirable,number,,Easternmost coordinate of data coverage,-1.30
+11,northBoundingCoordinate,desirable,Desirable,number,,Northernmost bounding coordinate of data coverage,51.30
+12,southBoundingCoordinate,desirable,Desirable,number,,Southernmost coordinate of data coverage,50.70
+13,temporalCoverageStartDate,desirable,Desirable,date,,Earliest record date,2020-09-19
+14,temporalCoverageEndDate,desirable,Desirable,date,,Latest record date,2020-09-21
+15,purpose,desirable,Desirable,string,,"The purpose for which the records were originally collected and also, where different, the reason for producing the dataset.",Carbon monitoring across the New Forest OR Tree planting investigative survey
+16,methods,desirable,Desirable,string,,"A concise description of the methods and techniques used in the creation of the dataset, including those used in data capture plus verification and validation. Highlight any areas of uncertainty with regard to any aspect of data capture and collation.",Covered in detail in accompanying report.
+17,qualityControl,desirable,Desirable,string,,"An assessment of the quality of data capture and/or the collated dataset as a whole. Ascribe your general level of confidence in the data source, processing, validation, and record collation.",
+18,contactGivenName,desirable,Desirable,string,,Dataset contact's first name,Pete
+19,contactSurname,desirable,Desirable,string,,Dataset contact's surname,Marsh
+20,contactElectronicMailAddress,required,Required,string,,Dataset contact's email,pete.marsh@example.com
+21,contactPhone,desirable,Desirable,string,,Dataset contact's phone number,0800 1234567
