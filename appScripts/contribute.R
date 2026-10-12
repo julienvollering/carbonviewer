@@ -240,7 +240,9 @@ draft_methods <- function(answers, records, std, lang = "no") {
   dates <- record_date_range(records$recordDate)
   n_no <- sum(records$probeReachedBottom %in% "false")
   probe <- answers$probeType
-  probe_lab <- if (!is.null(probe) && !is_blank(probe)) {
+  # "other" has no meaningful label for an outside reader; the equipment is
+  # described in the remarks instead, so the method text leaves it out.
+  probe_lab <- if (!is.null(probe) && !is_blank(probe) && !identical(probe, "other")) {
     lab <- names(std_choices(std, "probeType", lang))[match(probe, std_choices(std, "probeType", lang))]
     tolower(sub(" \\(.*\\)$", "", lab))
   }
@@ -275,7 +277,7 @@ draft_methods <- function(answers, records, std, lang = "no") {
       s <- paste0(s, if (dates[1] == dates[2]) paste0(" on ", dates[1])
                   else paste0(" between ", dates[1], " and ", dates[2]))
     }
-    if (!is.null(probe_lab)) s <- paste0(s, " using a ", probe_lab)
+    if (!is.null(probe_lab)) s <- paste0(s, " using ", if (grepl("^[aeiou]", probe_lab)) "an " else "a ", probe_lab)
     s <- paste0(s, ".")
     if (!is.null(res_lab)) s <- paste0(s, " Depths were read to the ", tolower(res_lab), ".")
     s <- paste0(s, if (n_no == 0) " The bottom of the peat was reached at all points."

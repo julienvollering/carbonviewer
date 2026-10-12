@@ -121,6 +121,14 @@ test_that("the module can be switched off", {
   expect_true(contribute_enabled())
 })
 
+test_that("the methods draft leaves out an 'other' probe and uses the right article", {
+  recs <- standardize_points(make_points(), full_answers, std)
+  m <- function(probe) draft_methods(modifyList(full_answers, list(probeType = probe)), recs, std, "en")
+  expect_false(grepl("using", m("other")))
+  expect_match(m("peat probe"), "using a peat probe")
+  expect_match(m("avalanche probe"), "using an avalanche probe")
+})
+
 test_that("store_submission is a Phase 2 stub", {
   expect_warning(res <- store_submission(character(), list()), "not implemented")
   expect_false(res)
