@@ -1,6 +1,8 @@
 # Plan: "Contribute your peat depths": a standardization and archiving add-on for CarbonViewer
 
-> **For the implementing session:** this plan was drafted and agreed with the user on 2026-10-09. Implement **Phase 1 only** on branch `standardize-archive-depths`. The standard files are in `standard/`. The app runs in Docker; see `docs/project_structure.md`. Ask the user before changing any decision listed under "Decisions made".
+> **Status (2026-10-12):** Phase 1 is implemented and has been through two manual test rounds (see the end of this document). Phases 2–3 are not started. Automated tests for the standard and the packaging code are in `tests/testthat/` (run `Rscript tests/testthat.R` from the repository root). The wizard itself, large datasets and both languages still need manual runs in Docker; see "Verification".
+>
+> **For the implementing session:** this plan was drafted and agreed with the user on 2026-10-09. Phase 1 is on branch `claude/contribute-plan-phase-1-ifc1p5`. The standard files are in `standard/`. The app runs in Docker; see `docs/project_structure.md`. Ask the user before changing any decision listed under "Decisions made".
 
 ## Context
 
@@ -63,10 +65,9 @@ The app reads the **YAML** at runtime using the `yaml` package, which ships with
 ## Recommended approach (phased)
 
 ### Phase 1: Standardize and download (no infrastructure needed)
-Wizard steps (steps 2 and 3 were swapped after the first test run, see the end of this plan):
+Wizard steps, in the order the app uses them:
 1. **Intro and consent:** what happens to the data, that taking part is optional, and a GDPR note.
-2. **Review points:** a map and an editable table, with derived fields filled in.
-3. **Measurement questions,** asked once for the whole dataset:
+2. **Measurement questions,** asked once for the whole dataset:
    - survey date or date range
    - surveyor
    - probe type
@@ -74,6 +75,7 @@ Wizard steps (steps 2 and 3 were swapped after the first test run, see the end o
    - depth resolution
    - positioning method → coordinate uncertainty
    - remarks
+3. **Review points:** a map and an editable table, with derived fields filled in from the answers above.
 4. **Dataset metadata:** title, organisation, abstract, purpose, contact email, licence, location and geographic description.
 5. **Validate and preview:** run the schema validator and show a summary.
 6. **Download:** a zip containing `peat_data.csv` (columns in the standard's `order`, RFC 4180 with CRLF via `data.table::fwrite(eol = "\r\n")`), `metadata.csv` (one header row + one value row), and a `README.txt` that cites the standard and profile versions. It reuses the pattern from `output$downloadData` (`server.R:557`).
@@ -95,6 +97,7 @@ A curator merges reviewed submissions into a versioned national dataset with a D
 - `appScripts/dependancies.R` + `Dockerfile`: add `shinyvalidate` and `yaml`.
 - `translation.json`: the UI strings (field labels come from the profile overlay).
 - `docs/instructions_*.md` and `docs/project_structure.md`: document the feature and the new data files.
+- **New** `tests/testthat.R` and `tests/testthat/`: unit tests for `standard.R` and the non-Shiny helpers in `contribute.R`. They source those two files directly and do not start the app or need Docker.
 
 ## Existing code to reuse
 - `df_reactive$points` / `df_reactive$shape` (already validated, EPSG:25833): `server.R:161-173`
@@ -103,15 +106,19 @@ A curator merges reviewed submissions into a versioned national dataset with a D
 - i18n setup: `dependancies.R:24-26`
 
 ## Verification
-- Run `docker compose up`, load a real-format zip (`test/test_dataset_cm.zip` uploaded through the file input, so the invitation appears), and step through the wizard in NO and EN.
-- Unit-check `validate_against_standard()` with small data frames: a missing `probeReachedBottom`, lat/lon without `geodeticDatum`, elevation without `verticalDatum`, and a bad enum value.
-- Check the output: columns and order match `peat_data_attributes.csv`; required metadata terms from `peat_metadata_terms.csv` are present; `verbatimSRS = EPSG:25833` on every row; coordinates round-trip 25833 ↔ 4326; the CSV parses as RFC 4180.
-- Edge cases:
-  - zero depths
-  - each of the three "reached bottom" answers
-  - an uploaded CSV that already contains `probeReachedBottom`
-  - a multi-day survey
-  - thousands of points
+
+### Automated (`Rscript tests/testthat.R`, no Docker needed)
+- `validate_against_standard()`: a missing `probeReachedBottom`, lat/lon without `geodeticDatum`, elevation without `verticalDatum`, bad enum, number, boolean and date values, a missing location, and depth-or-presence. Messages exist in NO and EN.
+- Output: column order matches `peat_data_attributes.csv`; required metadata terms are enforced; `verbatimSRS = EPSG:25833` on every row; coordinates round-trip 25833 ↔ 4326; the CSV parses as RFC 4180 (CRLF, commas, quotes, æøå).
+- Edge cases: zero depths, each of the three "reached bottom" answers, an uploaded CSV that already contains `probeReachedBottom` (`ja`/`Nei`/`TRUE`/empty), extra upload columns, per-row edits, other depth resolutions, a multi-day survey, the NLOD → `Other` + `rights` licence mapping, and the on/off switch.
+
+### Manual (Docker; not covered by the tests)
+- Run `docker compose up`, load a real-format zip (`test/test_dataset_cm.zip` uploaded through the file input, so the invitation appears), and step through the wizard in NO and EN, including a language switch part-way.
+- Contribute without running "Beregn"; the invitation is skipped if the tab was already opened and never shown for test data.
+- Review table: map selection, "Move selected to top", editing the next cell before the previous edit is saved, and clickable step names with validation.
+- Upload the broken zips in `test/` (`csv_only`, `invalid_csv`, `invalid_shp`, `shp_no_proj_file`) to the contribute tab and check that the errors are clean.
+- Thousands of points: responsiveness of the table and the map.
+- `options(carbonviewer.contribute = FALSE)` leaves the app unchanged.
 
 ## Feedback from the first test run (2026-10-09)
 Notes from stepping through the wizard in Docker, and how each is handled:
