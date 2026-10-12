@@ -94,7 +94,7 @@ sidebar <- shinydashboard::dashboardSidebar(
   i18n$t("App laget med"), emo::ji("heart"), i18n$t("av IPN-GRAN-teamet."),
   br(),
   br(),
-  "Carbonviewer v. 1.0.0"
+  "Carbonviewer v. 1.1.0"
 )
 
 # BODY ------------------------------------------------------------------------------------------------

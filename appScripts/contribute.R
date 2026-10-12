@@ -8,7 +8,7 @@
 # zip itself (read_dataset_zip() in global.R), so it does not need the volume
 # calculation.
 
-contribute_app_version <- "CarbonViewer 1.0.0"
+contribute_app_version <- "CarbonViewer 1.1.0"
 
 # Wizard steps, in order
 contribute_steps <- c("intro", "measure", "review", "metadata", "validate", "download")

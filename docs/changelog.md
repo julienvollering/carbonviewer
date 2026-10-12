@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased]
+## Version 1.1.0 (2026-10-12)
+
+*Minor release*
 
 **Added**
 - export to .txt file 
