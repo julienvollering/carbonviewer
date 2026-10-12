@@ -113,14 +113,6 @@ test_that("translation lookup falls back to the key", {
   expect_equal(contribute_tr("no such string", "en"), "no such string")
 })
 
-test_that("the module can be switched off", {
-  old <- options(carbonviewer.contribute = FALSE)
-  on.exit(options(old))
-  expect_false(contribute_enabled())
-  options(carbonviewer.contribute = TRUE)
-  expect_true(contribute_enabled())
-})
-
 test_that("the methods draft leaves out an 'other' probe and uses the right article", {
   recs <- standardize_points(make_points(), full_answers, std)
   m <- function(probe) draft_methods(modifyList(full_answers, list(probeType = probe)), recs, std, "en")

@@ -19,7 +19,7 @@ People submit peat depth points to CarbonViewer (a zip with a polygon shapefile 
 
 ## Decisions made (2026-10-09)
 - **Scope now = Phase 1 only** (standardize + download). Phases 2–3 stay as a roadmap, with a `store_submission()` stub left in place.
-- **Upstream PR target:** a clean, optional module that can be switched off (`options(carbonviewer.contribute = TRUE)`), with minimal edits to existing files and NO/EN strings.
+- **Upstream PR target:** a clean, self-contained module (no on/off option: if the maintainers do not want the feature, they decline the PR), with minimal edits to existing files and NO/EN strings.
 - **Entry point:** a modal `Yes / Not now` popup after a successful calculation, shown once per session and never for the test-data run. "Yes" switches to a "Bidra med data / Contribute data" tab, which also stays in the sidebar.
 - **Standard:** the NE v1.0 attribute names and structure via the corrected machine-readable profile (below), plus a thin Norwegian profile.
 
@@ -118,7 +118,6 @@ A curator merges reviewed submissions into a versioned national dataset with a D
 - Review table: map selection, "Move selected to top", editing the next cell before the previous edit is saved, and clickable step names with validation.
 - Upload the broken zips in `test/` (`csv_only`, `invalid_csv`, `invalid_shp`, `shp_no_proj_file`) to the contribute tab and check that the errors are clean.
 - Thousands of points: responsiveness of the table and the map.
-- `options(carbonviewer.contribute = FALSE)` leaves the app unchanged.
 
 ## Feedback from the first test run (2026-10-09)
 Notes from stepping through the wizard in Docker, and how each is handled:

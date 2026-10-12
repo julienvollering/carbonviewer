@@ -7,7 +7,7 @@
         deploy.yml          # Github action for deployment
 ├── appScripts
     ├── custom_theme.R      # Custom theme for the app 
-    ├── contribute.R        # Optional "Contribute data" module (standardize + download peat depths)
+    ├── contribute.R        # "Contribute data" module (standardize + download peat depths)
     ├── dependancies.R      # Required packages and translation object (i18n)
     ├── global.R            # Global variables
     ├── server.R            # Server side of the app
@@ -64,7 +64,6 @@
 
 
 ### "Contribute data" module
-- Optional; switch it off with `options(carbonviewer.contribute = FALSE)` in `app.R`.
 - Code in `appScripts/contribute.R` (module + helpers) and `appScripts/standard.R` (standard loader + validator).
 - The app reads `standard/peat_standard_v1.0.yaml` and `standard/peat_standard_no_profile.yaml` at runtime. With docker compose, `./standard` is mounted into the container.
 - The module reads the uploaded zip itself with `read_dataset_zip()` (`appScripts/global.R`, also used by the volume calculation), so it works without the volume calculation.

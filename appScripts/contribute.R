@@ -1,5 +1,5 @@
 ## contribute.R ##
-# Optional "Contribute your peat depths" module (Phase 1: standardize + download).
+# "Contribute your peat depths" module (Phase 1: standardize + download).
 #
 # Turns the uploaded peat depth points into records that follow the
 # Data Exchange Standard for Peat Surveys v1.0 (corrected profile) with the
@@ -7,10 +7,6 @@
 # them as a zip. Nothing is stored on the server. The module reads the uploaded
 # zip itself (read_dataset_zip() in global.R), so it does not need the volume
 # calculation.
-#
-# Switch off with options(carbonviewer.contribute = FALSE) before the app starts.
-
-contribute_enabled <- function() isTRUE(getOption("carbonviewer.contribute", TRUE))
 
 contribute_app_version <- "CarbonViewer 1.0.0"
 
@@ -534,7 +530,7 @@ mod_contribute_server <- function(id, zip_path, lang,
     })
 
     invite <- function() {
-      if (isolate(invited()) || !contribute_enabled()) return(invisible())
+      if (isolate(invited())) return(invisible())
       invited(TRUE)
       l <- isolate(lang())
       showModal(modalDialog(

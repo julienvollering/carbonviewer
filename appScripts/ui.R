@@ -87,10 +87,8 @@ sidebar <- shinydashboard::dashboardSidebar(
       downloadButton("downloadData", shiny::HTML("Download"))
     ),
     
-    # Optional "Contribute data" module (appScripts/contribute.R)
-    .list = if (contribute_enabled()) list(
-      menuItem(i18n$t("Bidra med data"), tabName = "contribute", icon = icon("share-from-square"))
-    )
+    # "Contribute data" module (appScripts/contribute.R)
+    menuItem(i18n$t("Bidra med data"), tabName = "contribute", icon = icon("share-from-square"))
   ),
   hr(),
   i18n$t("App laget med"), emo::ji("heart"), i18n$t("av IPN-GRAN-teamet."),
@@ -132,10 +130,8 @@ body <- shinydashboard::dashboardBody(
               box(plotOutput("volumeVSpower"), width = 6),
             ))
   ),
-  # Optional "Contribute data" module (appScripts/contribute.R)
-  if (contribute_enabled()) list(
-    tabItem(tabName = "contribute", mod_contribute_ui("contribute"))
-  )))
+  # "Contribute data" module (appScripts/contribute.R)
+  tabItem(tabName = "contribute", mod_contribute_ui("contribute"))))
 )
 
 # Put them together into a dashboardPage

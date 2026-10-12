@@ -69,13 +69,11 @@ server <- function(input, output, session){
     values$upload_state <- 'test'
   })
   
-  # Optional "Contribute data" module (appScripts/contribute.R). It reads the
+  # "Contribute data" module (appScripts/contribute.R). It reads the
   # uploaded zip itself, so it works before (or without) the volume calculation.
-  if (contribute_enabled()) {
-    contribute <- mod_contribute_server("contribute",
-                                        zip_path = reactive(input$upload_zip$datapath),
-                                        lang = reactive(input$selected_language %||% "no"))
-  }
+  contribute <- mod_contribute_server("contribute",
+                                      zip_path = reactive(input$upload_zip$datapath),
+                                      lang = reactive(input$selected_language %||% "no"))
   
   # ! PRIMARY PART !
   # Unzip the file into the unique session folder
@@ -133,7 +131,7 @@ server <- function(input, output, session){
           df_reactive$volumeVSpower <- interp[[5]]
           
           # Invite the user to contribute their points (never for the test data)
-          if (contribute_enabled() && values$upload_state == 'uploaded') {
+          if (values$upload_state == 'uploaded') {
             contribute$invite()
           }
           
