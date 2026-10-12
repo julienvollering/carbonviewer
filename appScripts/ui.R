@@ -131,7 +131,8 @@ body <- shinydashboard::dashboardBody(
             ))
   ),
   # "Contribute data" module (appScripts/contribute.R)
-  tabItem(tabName = "contribute", mod_contribute_ui("contribute"))))
+  # (wrapped in list(): c() on a bare tag would flatten it into its parts)
+  list(tabItem(tabName = "contribute", mod_contribute_ui("contribute")))))
 )
 
 # Put them together into a dashboardPage
